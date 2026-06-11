@@ -73,7 +73,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus("local");
         return;
       }
-      const json = (await res.json()) as { data: Partial<AppState> | null };
+      const json = (await res.json()) as {
+        data: Partial<AppState> | null;
+        remote?: boolean;
+      };
+      // If the server has no cloud database wired up, stay in local-only mode
+      // (no errors, just per-device localStorage).
+      if (json.remote === false) {
+        remoteEnabled.current = false;
+        setSyncStatus("local");
+        return;
+      }
       remoteEnabled.current = true;
       if (json.data && json.data.positions) {
         const merged = mergeWithDefaults(json.data);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readState, writeState } from "@/lib/server-storage";
+import { readState, writeState, remoteConfigured } from "@/lib/server-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   }
   try {
     const data = await readState();
-    return NextResponse.json({ data });
+    return NextResponse.json({ data, remote: remoteConfigured() });
   } catch (e) {
     return NextResponse.json(
       { error: "read_failed", message: String(e) },

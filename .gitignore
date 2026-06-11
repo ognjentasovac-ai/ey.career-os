@@ -13,3 +13,5 @@ next-env.d.ts
 # Local cloud-sync fallback cache
 /.data
 dev.log
+
+.vercel
