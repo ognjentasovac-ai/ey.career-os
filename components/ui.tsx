@@ -328,7 +328,7 @@ export function SectionHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="flex items-start gap-3">
-        <span className="mt-1 h-7 w-1 rounded-full bg-gradient-to-b from-accent to-emerald-700" />
+        <span className="mt-1 h-7 w-1 rounded-full bg-gradient-to-b from-accent to-gold" />
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             {title}

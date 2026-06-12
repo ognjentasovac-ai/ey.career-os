@@ -1,25 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const display = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Career OS · Ognjen Tasovac",
@@ -33,10 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`dark ${inter.variable} ${display.variable} ${mono.variable}`}
-    >
+    <html lang="en">
       <body className="app-bg min-h-screen antialiased">{children}</body>
     </html>
   );

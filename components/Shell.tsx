@@ -149,7 +149,7 @@ export function Shell() {
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-accent to-emerald-700 text-sm font-bold text-white shadow-lg shadow-accent/20">
+            <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-accent to-[hsl(215_55%_34%)] text-sm font-bold text-white shadow-lg shadow-accent/20 ring-1 ring-gold/40">
               OT
             </div>
             <div>
@@ -178,7 +178,7 @@ export function Shell() {
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-accent to-emerald-400"
+              className="h-full rounded-full bg-gradient-to-r from-accent to-gold"
               style={{ width: `${m.partnerReadiness}%` }}
             />
           </div>

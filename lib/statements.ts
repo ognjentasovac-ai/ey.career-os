@@ -1,5 +1,5 @@
 import type { StatementPeriod, StatementCase, PLData, BSData } from "./types";
-import { todayISO } from "./utils";
+import { todayISO, eur } from "./utils";
 
 export const MONTHS = [
   "Jan",
@@ -17,7 +17,28 @@ export const MONTHS = [
 ];
 
 export function emptyPL(): PLData {
-  return { revenue: 0, cogs: 0, opex: 0, otherIncome: 0, da: 0, interest: 0, tax: 0 };
+  return {
+    revenue: 0,
+    cogs: 0,
+    salaries: 0,
+    transport: 0,
+    marketing: 0,
+    opex: 0,
+    otherIncome: 0,
+    da: 0,
+    interest: 0,
+    tax: 0,
+  };
+}
+
+/** Total operating expenses below gross profit (excl. D&A). */
+export function totalOpex(pl: PLData): number {
+  return (
+    (pl.salaries || 0) +
+    (pl.transport || 0) +
+    (pl.marketing || 0) +
+    (pl.opex || 0)
+  );
 }
 
 export function emptyBS(): BSData {
@@ -79,7 +100,7 @@ function safeDiv(a: number, b: number): number {
 export function analysePeriod(p: StatementPeriod): PeriodAnalysis {
   const { pl, bs } = p;
   const grossProfit = pl.revenue - pl.cogs;
-  const ebitda = grossProfit - pl.opex + pl.otherIncome;
+  const ebitda = grossProfit - totalOpex(pl) + pl.otherIncome;
   const ebit = ebitda - pl.da;
   const pbt = ebit - pl.interest;
   const netIncome = pbt - pl.tax;
@@ -256,8 +277,28 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
   if (!L) return [];
 
   const q: QuizQuestion[] = [];
+  const lp = c.periods[c.periods.length - 1].pl;
+  const rev = lp.revenue || 1;
+  const pctOf = (x: number) => (x / rev) * 100;
 
-  // 1 — Investment recommendation
+  // Biggest segment mover between the last two periods.
+  const lastSeg = c.periods[c.periods.length - 1].segments || [];
+  const prevSeg =
+    c.periods.length > 1 ? c.periods[c.periods.length - 2].segments || [] : [];
+  let mover = "";
+  if (lastSeg.length && prevSeg.length) {
+    let best: { name: string; g: number } | null = null;
+    for (const s of lastSeg) {
+      const prev = prevSeg.find((x) => x.name === s.name);
+      if (prev && prev.value) {
+        const g = ((s.value - prev.value) / prev.value) * 100;
+        if (!best || Math.abs(g) > Math.abs(best.g)) best = { name: s.name, g };
+      }
+    }
+    if (best) mover = `${best.name} (${best.g >= 0 ? "+" : ""}${best.g.toFixed(0)}%)`;
+  }
+
+  // 1 — Investment recommendation (EY: should the investor buy?)
   const growthVerdict =
     a.revenueCagr > 8 ? "strong top-line growth" : a.revenueCagr > 0 ? "modest growth" : "flat/declining revenue";
   const leverageVerdict =
@@ -265,7 +306,7 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
   q.push({
     id: "recommendation",
     question:
-      "Would you advise the investor to acquire this business? Build the bull and bear case.",
+      "EY view — should the investor BUY this business or walk away? Build the bull and bear case and give a clear verdict.",
     hint: `Revenue CAGR ${fmt(a.revenueCagr, "%")}, EBITDA margin ${fmt(
       L.ebitdaMargin,
       "%"
@@ -274,7 +315,27 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
       "x"
     )}. Profile reads as ${growthVerdict} and ${leverageVerdict}.`,
     eyAngle:
-      "Frame it as: quality of growth (organic vs price), margin durability, cash conversion, balance-sheet risk, and what could break the thesis.",
+      "Frame it as: quality of growth (organic vs price), margin durability, cash conversion, balance-sheet risk, and what could break the thesis. End with a Buy / Pass call.",
+  });
+
+  // 2 — Growth or decline drivers + projection direction
+  const dir =
+    a.revenueCagr > 1 ? "GROWING" : a.revenueCagr < -1 ? "DECLINING" : "broadly FLAT";
+  const ebitdaDir =
+    a.ebitdaCagr > 1 ? "rising" : a.ebitdaCagr < -1 ? "falling" : "flat";
+  q.push({
+    id: "growth",
+    question:
+      "What is the company growing — or shrinking — on the back of? Is the trend structural or temporary, and where do you project the next 3 years (up or down)?",
+    hint: `Revenue is ${dir} at ${fmt(a.revenueCagr, "%")} CAGR; EBITDA is ${ebitdaDir} (${fmt(
+      a.ebitdaCagr,
+      "%"
+    )}). Margin ${a.marginDelta >= 0 ? "expanded" : "compressed"} ${fmt(
+      Math.abs(a.marginDelta),
+      "ppt"
+    )}. Biggest segment move: ${mover || "add segments to see"}.`,
+    eyAngle:
+      "Separate volume vs price vs mix. Decide if the driver is structural (market growth, share gains, new products) or cyclical/one-off — that decides whether you project continued growth or a decline. Use the Projection tab to test both.",
   });
 
   // 2 — Revenue source
@@ -291,6 +352,28 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     hint: `Revenue ${fmt(L.revenue)}. Segment mix: ${segText}. Check concentration risk and which segment drives growth.`,
     eyAngle:
       "EY would test revenue by customer, product, geography and channel — recurring vs one-off, and the top-customer concentration.",
+  });
+
+  // Cost structure — where does the money go?
+  q.push({
+    id: "costs",
+    question:
+      "Where does the money go? Walk through the cost structure — COGS, salaries, transport, marketing and other opex — and the operating-leverage potential.",
+    hint: `As % of revenue: COGS ${fmt(pctOf(lp.cogs), "%")}, salaries ${fmt(
+      pctOf(lp.salaries),
+      "%"
+    )}, transport ${fmt(pctOf(lp.transport), "%")}, marketing ${fmt(
+      pctOf(lp.marketing),
+      "%"
+    )}, other opex ${fmt(pctOf(lp.opex), "%")}. Largest cost base after COGS: ${
+      lp.salaries >= lp.transport && lp.salaries >= lp.opex
+        ? "salaries"
+        : lp.transport >= lp.opex
+        ? "transport / logistics"
+        : "other opex"
+    }.`,
+    eyAngle:
+      "Split fixed vs variable. A heavy fixed base (payroll, transport fleet, rent) means EBITDA swings hard with volume — central to the downside case. Identify the cost levers a PE owner could pull.",
   });
 
   // 3 — EBITDA quality
@@ -311,6 +394,28 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
       : `EBITDA margin ${fmt(L.ebitdaMargin, "%")}. Add a second year to decompose the change.`,
     eyAngle:
       "Normalise for one-offs (the 'quality of earnings'): are there non-recurring items, capitalised costs, or under-investment in opex inflating EBITDA?",
+  });
+
+  // Red flags / deal-breakers (EY quality-of-earnings lens)
+  const conc =
+    lastSeg.length && sumSegments(lastSeg) > 0
+      ? Math.max(...lastSeg.map((s) => (s.value / sumSegments(lastSeg)) * 100))
+      : 0;
+  q.push({
+    id: "redflags",
+    question:
+      "From EY's quality-of-earnings lens, what are the red flags or deal-breakers that could kill this acquisition?",
+    hint: `Net debt/EBITDA ${fmt(L.netDebtToEbitda, "x")}, current ratio ${fmt(
+      L.currentRatio,
+      "x"
+    )}, cash cycle ${fmt(L.cashConversionCycle, "d")}. Top segment is ${fmt(
+      conc,
+      "%"
+    )} of revenue (concentration). ${
+      L.balances ? "Balance sheet balances." : "Balance sheet does NOT balance — investigate."
+    } Net debt ${eur(L.netDebt)}.`,
+    eyAngle:
+      "QoE normalises EBITDA for one-offs, owner add-backs and accounting choices — the 'clean' number is what a buyer actually pays a multiple on. Probe receivables build, customer concentration, capex needs and covenant headroom.",
   });
 
   // 4 — Working capital & cash

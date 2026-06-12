@@ -383,7 +383,10 @@ function buildStatementCases(): import("./types").StatementCase[] {
           pl: {
             revenue: 24000000,
             cogs: 14400000,
-            opex: 6500000,
+            salaries: 4000000,
+            transport: 1200000,
+            marketing: 800000,
+            opex: 500000,
             otherIncome: 0,
             da: 900000,
             interest: 420000,
@@ -417,7 +420,10 @@ function buildStatementCases(): import("./types").StatementCase[] {
           pl: {
             revenue: 28800000,
             cogs: 16700000,
-            opex: 7300000,
+            salaries: 4500000,
+            transport: 1300000,
+            marketing: 950000,
+            opex: 550000,
             otherIncome: 0,
             da: 980000,
             interest: 450000,
@@ -464,7 +470,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "saas_fy22",
           label: "FY2022",
-          pl: { revenue: 8000000, cogs: 1600000, opex: 5200000, otherIncome: 0, da: 300000, interest: 50000, tax: 100000 },
+          pl: { revenue: 8000000, cogs: 1600000, salaries: 3800000, transport: 100000, marketing: 900000, opex: 400000, otherIncome: 0, da: 300000, interest: 50000, tax: 100000 },
           bs: { cash: 3000000, receivables: 1300000, inventory: 0, otherCA: 200000, ppe: 400000, intangibles: 1200000, otherNCA: 100000, payables: 400000, shortDebt: 0, otherCL: 1800000, longDebt: 500000, otherLTL: 200000, equity: 3300000 },
           seasonality: [8, 8, 8, 9, 8, 8, 8, 8, 9, 8, 9, 9],
           segments: [
@@ -475,7 +481,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "saas_fy23",
           label: "FY2023",
-          pl: { revenue: 11200000, cogs: 2150000, opex: 6900000, otherIncome: 0, da: 380000, interest: 45000, tax: 220000 },
+          pl: { revenue: 11200000, cogs: 2150000, salaries: 5000000, transport: 150000, marketing: 1300000, opex: 450000, otherIncome: 0, da: 380000, interest: 45000, tax: 220000 },
           bs: { cash: 4200000, receivables: 1750000, inventory: 0, otherCA: 250000, ppe: 450000, intangibles: 1500000, otherNCA: 100000, payables: 500000, shortDebt: 0, otherCL: 2600000, longDebt: 400000, otherLTL: 200000, equity: 4550000 },
           seasonality: [8, 8, 8, 9, 8, 8, 8, 8, 9, 8, 9, 9],
           segments: [
@@ -494,7 +500,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "mfg_fy22",
           label: "FY2022",
-          pl: { revenue: 40000000, cogs: 28800000, opex: 6800000, otherIncome: 0, da: 2400000, interest: 1100000, tax: 200000 },
+          pl: { revenue: 40000000, cogs: 28800000, salaries: 3800000, transport: 1900000, marketing: 500000, opex: 600000, otherIncome: 0, da: 2400000, interest: 1100000, tax: 200000 },
           bs: { cash: 1500000, receivables: 5500000, inventory: 7200000, otherCA: 400000, ppe: 18000000, intangibles: 500000, otherNCA: 300000, payables: 4800000, shortDebt: 3000000, otherCL: 1200000, longDebt: 12000000, otherLTL: 1400000, equity: 11000000 },
           seasonality: [8, 8, 9, 9, 9, 9, 7, 5, 9, 10, 9, 8],
           segments: [
@@ -506,7 +512,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "mfg_fy23",
           label: "FY2023",
-          pl: { revenue: 42400000, cogs: 30200000, opex: 7100000, otherIncome: 0, da: 2500000, interest: 1150000, tax: 290000 },
+          pl: { revenue: 42400000, cogs: 30200000, salaries: 3950000, transport: 2000000, marketing: 520000, opex: 630000, otherIncome: 0, da: 2500000, interest: 1150000, tax: 290000 },
           bs: { cash: 1700000, receivables: 5800000, inventory: 7500000, otherCA: 450000, ppe: 18500000, intangibles: 480000, otherNCA: 300000, payables: 5000000, shortDebt: 3000000, otherCL: 1300000, longDebt: 11000000, otherLTL: 1400000, equity: 13030000 },
           seasonality: [8, 8, 9, 9, 9, 9, 7, 5, 9, 10, 9, 8],
           segments: [
@@ -526,7 +532,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "groc_fy22",
           label: "FY2022",
-          pl: { revenue: 120000000, cogs: 93600000, opex: 22000000, otherIncome: 0, da: 2800000, interest: 900000, tax: 200000 },
+          pl: { revenue: 120000000, cogs: 93600000, salaries: 13000000, transport: 4500000, marketing: 1800000, opex: 2700000, otherIncome: 0, da: 2800000, interest: 900000, tax: 200000 },
           bs: { cash: 3000000, receivables: 1200000, inventory: 7800000, otherCA: 600000, ppe: 14000000, intangibles: 2000000, otherNCA: 400000, payables: 11000000, shortDebt: 2000000, otherCL: 2200000, longDebt: 7000000, otherLTL: 1000000, equity: 5800000 },
           seasonality: [8, 7, 8, 8, 8, 8, 8, 8, 8, 9, 9, 11],
           segments: [
@@ -538,7 +544,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "groc_fy23",
           label: "FY2023",
-          pl: { revenue: 124800000, cogs: 97000000, opex: 22800000, otherIncome: 0, da: 2900000, interest: 950000, tax: 250000 },
+          pl: { revenue: 124800000, cogs: 97000000, salaries: 13500000, transport: 4600000, marketing: 1850000, opex: 2850000, otherIncome: 0, da: 2900000, interest: 950000, tax: 250000 },
           bs: { cash: 3400000, receivables: 1300000, inventory: 8100000, otherCA: 650000, ppe: 14500000, intangibles: 2000000, otherNCA: 400000, payables: 11500000, shortDebt: 2000000, otherCL: 2300000, longDebt: 6500000, otherLTL: 1000000, equity: 7050000 },
           seasonality: [8, 7, 8, 8, 8, 8, 8, 8, 8, 9, 9, 11],
           segments: [
@@ -558,7 +564,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "cons_fy22",
           label: "FY2022",
-          pl: { revenue: 15000000, cogs: 9000000, opex: 3600000, otherIncome: 0, da: 200000, interest: 80000, tax: 350000 },
+          pl: { revenue: 15000000, cogs: 9000000, salaries: 2400000, transport: 200000, marketing: 500000, opex: 500000, otherIncome: 0, da: 200000, interest: 80000, tax: 350000 },
           bs: { cash: 1800000, receivables: 3800000, inventory: 0, otherCA: 300000, ppe: 600000, intangibles: 200000, otherNCA: 150000, payables: 700000, shortDebt: 0, otherCL: 1500000, longDebt: 300000, otherLTL: 250000, equity: 4100000 },
           seasonality: [9, 8, 9, 8, 8, 7, 6, 5, 9, 10, 11, 10],
           segments: [
@@ -570,7 +576,7 @@ function buildStatementCases(): import("./types").StatementCase[] {
         {
           id: "cons_fy23",
           label: "FY2023",
-          pl: { revenue: 17700000, cogs: 10500000, opex: 4100000, otherIncome: 0, da: 220000, interest: 70000, tax: 470000 },
+          pl: { revenue: 17700000, cogs: 10500000, salaries: 2700000, transport: 220000, marketing: 580000, opex: 600000, otherIncome: 0, da: 220000, interest: 70000, tax: 470000 },
           bs: { cash: 2400000, receivables: 4300000, inventory: 0, otherCA: 350000, ppe: 650000, intangibles: 200000, otherNCA: 150000, payables: 800000, shortDebt: 0, otherCL: 1800000, longDebt: 250000, otherLTL: 250000, equity: 4950000 },
           seasonality: [9, 8, 9, 8, 8, 7, 6, 5, 9, 10, 11, 10],
           segments: [

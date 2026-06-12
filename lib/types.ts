@@ -134,7 +134,11 @@ export interface AnnualNote {
 export interface PLData {
   revenue: number;
   cogs: number;
-  opex: number; // operating expenses excl. D&A
+  // Operating expenses below gross profit (all excl. D&A):
+  salaries: number; // wages, payroll, staff costs
+  transport: number; // transport, logistics, distribution
+  marketing: number; // marketing & selling
+  opex: number; // other operating expenses (rent, admin, utilities, etc.)
   otherIncome: number;
   da: number; // depreciation & amortisation
   interest: number;

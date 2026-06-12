@@ -3,22 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --background: 240 6% 5%;
-  --foreground: 0 0% 96%;
-  --panel: 240 5% 8%;
-  --elevated: 240 5% 11%;
-  --muted: 240 4% 16%;
-  --muted-foreground: 240 5% 58%;
-  --border: 240 5% 16%;
-  --input: 240 5% 14%;
-  --ring: 158 64% 42%;
-  --accent: 158 64% 42%;
+  /* Investment-banking palette — navy / gold / white, light theme */
+  --background: 210 36% 98%;
+  --foreground: 215 45% 16%;
+  --panel: 0 0% 100%;
+  --elevated: 214 32% 95%;
+  --muted: 214 30% 92%;
+  --muted-foreground: 215 16% 42%;
+  --border: 214 24% 86%;
+  --input: 0 0% 100%;
+  --ring: 215 55% 30%;
+  --accent: 215 60% 24%; /* deep navy — primary */
   --accent-foreground: 0 0% 100%;
-  --gold: 40 70% 58%;
-  --positive: 158 64% 45%;
-  --negative: 0 72% 58%;
-  --warning: 38 92% 56%;
-  --radius: 0.65rem;
+  --gold: 41 64% 42%; /* rich gold */
+  --positive: 150 52% 32%;
+  --negative: 0 62% 45%;
+  --warning: 32 78% 42%;
+  --radius: 0.5rem;
+
+  --font-sans: "Times New Roman", Times, Georgia, serif;
+  --font-display: "Times New Roman", Times, Georgia, serif;
+  --font-mono: "Times New Roman", Times, Georgia, serif;
 }
 
 * {
@@ -32,43 +37,44 @@ html {
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, .font-display {
-  font-family: var(--font-display), var(--font-sans), sans-serif;
-  letter-spacing: -0.01em;
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0;
 }
 
-/* Subtle terminal grid background */
+/* Subtle paper-grade background with navy + gold tints */
 .app-bg {
   background-color: hsl(var(--background));
   background-image:
-    radial-gradient(900px circle at 12% -5%, hsl(158 64% 42% / 0.10), transparent 45%),
-    radial-gradient(800px circle at 95% 0%, hsl(220 70% 45% / 0.08), transparent 40%),
-    radial-gradient(700px circle at 50% 110%, hsl(40 70% 55% / 0.05), transparent 45%);
+    radial-gradient(900px circle at 10% -5%, hsl(215 60% 24% / 0.05), transparent 45%),
+    radial-gradient(820px circle at 96% 0%, hsl(41 64% 45% / 0.07), transparent 42%);
   background-attachment: fixed;
 }
 
-/* Frosted panel used for cards and chrome */
 .panel-grad {
   background-image: linear-gradient(
     180deg,
-    hsl(0 0% 100% / 0.035),
+    hsl(215 40% 45% / 0.02),
     hsl(0 0% 100% / 0)
   );
 }
 
 .accent-text {
-  background: linear-gradient(90deg, hsl(var(--accent)), hsl(158 70% 65%));
+  background: linear-gradient(90deg, hsl(var(--accent)), hsl(215 60% 38%));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .gold-text {
-  background: linear-gradient(90deg, hsl(var(--gold)), hsl(45 85% 72%));
+  background: linear-gradient(90deg, hsl(var(--gold)), hsl(41 70% 52%));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -79,41 +85,43 @@ h1, h2, h3, .font-display {
 }
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 30px -12px hsl(0 0% 0% / 0.6);
+  border-color: hsl(var(--gold) / 0.5);
+  box-shadow: 0 14px 34px -16px hsl(215 50% 20% / 0.28);
 }
 
 .ring-grad {
   background: conic-gradient(
     from 180deg,
     hsl(var(--accent)),
-    hsl(220 70% 55%),
+    hsl(215 60% 40%),
     hsl(var(--gold)),
     hsl(var(--accent))
   );
 }
 
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(240 5% 20%);
+  background: hsl(214 20% 78%);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(240 5% 28%);
+  background: hsl(214 20% 68%);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
+/* Soft card lift on white */
 .glow-border {
-  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+  box-shadow: 0 1px 2px hsl(215 30% 20% / 0.05), 0 1px 0 hsl(0 0% 100% / 0.5) inset;
 }
 
 /* Range inputs */
@@ -131,8 +139,9 @@ input[type="range"]::-webkit-slider-thumb {
   height: 16px;
   width: 16px;
   border-radius: 9999px;
-  background: hsl(var(--accent));
+  background: hsl(var(--gold));
   border: 2px solid hsl(var(--background));
+  box-shadow: 0 1px 3px hsl(215 40% 20% / 0.3);
   cursor: pointer;
   transition: transform 0.1s ease;
 }
@@ -143,7 +152,7 @@ input[type="range"]::-moz-range-thumb {
   height: 14px;
   width: 14px;
   border-radius: 9999px;
-  background: hsl(var(--accent));
+  background: hsl(var(--gold));
   border: 2px solid hsl(var(--background));
   cursor: pointer;
 }

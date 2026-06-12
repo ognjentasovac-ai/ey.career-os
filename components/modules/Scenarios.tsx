@@ -35,10 +35,10 @@ const ORDER: ScenarioKey[] = [
 ];
 
 const SC_COLOR: Record<ScenarioKey, string> = {
-  conservative: "#64748b",
-  base: "#10b981",
-  aggressive: "#0ea5e9",
-  exceptional: "#eab308",
+  conservative: "#94a3b8", // slate
+  base: "#1f3a5f", // navy
+  aggressive: "#3d5a80", // steel
+  exceptional: "#c19a4b", // gold
 };
 
 export function Scenarios() {

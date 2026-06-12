@@ -58,7 +58,7 @@ import {
   Legend,
 } from "recharts";
 
-const PIE_COLORS = ["#10b981", "#0ea5e9", "#eab308", "#8b5cf6", "#ec4899", "#f97316"];
+const PIE_COLORS = ["#14264a", "#c19a4b", "#3d5a80", "#8aa1c1", "#9c7b30", "#5b7aa8"];
 
 function newPeriod(label: string): StatementPeriod {
   return {
@@ -340,8 +340,11 @@ function CaseDetail({
 /* ----------------------------- Inputs ---------------------------------- */
 const PL_FIELDS: { key: keyof PLData; label: string }[] = [
   { key: "revenue", label: "Revenue" },
-  { key: "cogs", label: "COGS" },
-  { key: "opex", label: "Operating expenses (excl. D&A)" },
+  { key: "cogs", label: "COGS (cost of goods sold)" },
+  { key: "salaries", label: "Salaries & wages" },
+  { key: "transport", label: "Transport & logistics" },
+  { key: "marketing", label: "Marketing & selling" },
+  { key: "opex", label: "Other operating expenses (rent, admin…)" },
   { key: "otherIncome", label: "Other income" },
   { key: "da", label: "Depreciation & amortisation" },
   { key: "interest", label: "Interest expense" },
@@ -680,10 +683,10 @@ function AnalysisView({ c }: { c: StatementCase }) {
                   contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="l" dataKey="Revenue" fill="#0ea5e9" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="l" dataKey="Revenue" fill="#14264a" radius={[3, 3, 0, 0]} />
                 <Bar yAxisId="l" dataKey="EBITDA" fill="hsl(var(--gold))" radius={[3, 3, 0, 0]} />
                 <Line yAxisId="r" dataKey="EBITDA %" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 3 }} />
-                <Line yAxisId="r" dataKey="Gross %" stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Line yAxisId="r" dataKey="Gross %" stroke="#3d5a80" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -809,20 +812,38 @@ function ProjectionView({ c, onChange }: { c: StatementCase; onChange: (c: State
   const nextYearRev = proj[0]?.revenue || 0;
   const monthly = seas.map((w, i) => ({ m: MONTHS[i], rev: Math.round((w / seasTotal) * nextYearRev) }));
 
+  const effG = growth !== null ? growth : a.periods.length > 1 ? a.revenueCagr : 5;
+  const isDecline = effG < -0.5;
+
   return (
     <div className="space-y-4">
       <Card className="panel-grad">
-        <CardContent className="flex flex-wrap items-center gap-4 p-5">
-          <div className="text-sm text-muted-foreground">
-            Forward projection from the latest period, holding the current EBITDA margin
-            constant and growing revenue at:
+        <CardContent className="flex flex-col gap-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              Forward projection from the latest period, holding the current EBITDA
+              margin constant. Pick a growth rate — or model a{" "}
+              <span className="text-foreground">decline</span>:
+            </div>
+            <Badge variant={isDecline ? "negative" : "positive"}>
+              {isDecline ? "Projected DECLINE" : "Projected GROWTH"} ·{" "}
+              {effG >= 0 ? "+" : ""}
+              {effG.toFixed(0)}%/yr
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant={growth === null ? "default" : "secondary"} onClick={() => setGrowth(null)}>
-              Auto CAGR {a.periods.length > 1 ? `(${a.revenueCagr.toFixed(0)}%)` : "(5%)"}
+              Auto trend {a.periods.length > 1 ? `(${a.revenueCagr >= 0 ? "+" : ""}${a.revenueCagr.toFixed(0)}%)` : "(5%)"}
             </Button>
-            {[5, 10, 15, 20].map((g) => (
-              <Button key={g} size="sm" variant={growth === g ? "default" : "secondary"} onClick={() => setGrowth(g)}>
+            {[-15, -10, -5, 5, 10, 15, 20].map((g) => (
+              <Button
+                key={g}
+                size="sm"
+                variant={growth === g ? "default" : "secondary"}
+                className={g < 0 && growth === g ? "bg-negative text-white hover:bg-negative/90" : ""}
+                onClick={() => setGrowth(g)}
+              >
+                {g > 0 ? "+" : ""}
                 {g}%
               </Button>
             ))}
@@ -843,7 +864,7 @@ function ProjectionView({ c, onChange }: { c: StatementCase; onChange: (c: State
                 <YAxis tickFormatter={(v) => eur(v)} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} width={50} />
                 <Tooltip contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => eurFull(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Revenue" fill="#0ea5e9" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Revenue" fill="#14264a" radius={[3, 3, 0, 0]} />
                 <Line dataKey="EBITDA" stroke="hsl(var(--gold))" strokeWidth={2} dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
