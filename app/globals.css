@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  /* Investment-banking palette — navy / gold / white, light theme */
-  --background: 210 36% 98%;
-  --foreground: 215 45% 16%;
-  --panel: 0 0% 100%;
-  --elevated: 214 32% 95%;
-  --muted: 214 30% 92%;
-  --muted-foreground: 215 16% 42%;
-  --border: 214 24% 86%;
-  --input: 0 0% 100%;
-  --ring: 215 55% 30%;
-  --accent: 215 60% 24%; /* deep navy — primary */
+  /* Investment-banking palette — DARK: deep navy + gold + steel-blue */
+  --background: 218 38% 8%;
+  --foreground: 218 24% 92%;
+  --panel: 219 32% 12%;
+  --elevated: 218 27% 17%;
+  --muted: 218 23% 22%;
+  --muted-foreground: 217 17% 64%;
+  --border: 218 21% 24%;
+  --input: 218 26% 14%;
+  --ring: 214 78% 60%;
+  --accent: 214 72% 58%; /* steel / azure blue — primary */
   --accent-foreground: 0 0% 100%;
-  --gold: 41 64% 42%; /* rich gold */
-  --positive: 150 52% 32%;
-  --negative: 0 62% 45%;
-  --warning: 32 78% 42%;
+  --gold: 43 72% 56%; /* bright gold */
+  --positive: 152 54% 50%;
+  --negative: 0 72% 64%;
+  --warning: 38 90% 58%;
   --radius: 0.5rem;
 
   --font-sans: "Times New Roman", Times, Georgia, serif;
@@ -49,32 +49,33 @@ h3,
   letter-spacing: 0;
 }
 
-/* Subtle paper-grade background with navy + gold tints */
+/* Deep navy background with navy + gold glows */
 .app-bg {
   background-color: hsl(var(--background));
   background-image:
-    radial-gradient(900px circle at 10% -5%, hsl(215 60% 24% / 0.05), transparent 45%),
-    radial-gradient(820px circle at 96% 0%, hsl(41 64% 45% / 0.07), transparent 42%);
+    radial-gradient(1000px circle at 10% -8%, hsl(214 72% 42% / 0.20), transparent 46%),
+    radial-gradient(900px circle at 96% -2%, hsl(43 72% 48% / 0.12), transparent 42%),
+    radial-gradient(800px circle at 50% 120%, hsl(214 60% 32% / 0.14), transparent 50%);
   background-attachment: fixed;
 }
 
 .panel-grad {
   background-image: linear-gradient(
     180deg,
-    hsl(215 40% 45% / 0.02),
+    hsl(0 0% 100% / 0.045),
     hsl(0 0% 100% / 0)
   );
 }
 
 .accent-text {
-  background: linear-gradient(90deg, hsl(var(--accent)), hsl(215 60% 38%));
+  background: linear-gradient(90deg, hsl(var(--accent)), hsl(200 80% 68%));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .gold-text {
-  background: linear-gradient(90deg, hsl(var(--gold)), hsl(41 70% 52%));
+  background: linear-gradient(90deg, hsl(var(--gold)), hsl(43 80% 70%));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -85,15 +86,15 @@ h3,
 }
 .hover-lift:hover {
   transform: translateY(-2px);
-  border-color: hsl(var(--gold) / 0.5);
-  box-shadow: 0 14px 34px -16px hsl(215 50% 20% / 0.28);
+  border-color: hsl(var(--gold) / 0.55);
+  box-shadow: 0 16px 38px -18px hsl(0 0% 0% / 0.7);
 }
 
 .ring-grad {
   background: conic-gradient(
     from 180deg,
     hsl(var(--accent)),
-    hsl(215 60% 40%),
+    hsl(200 80% 60%),
     hsl(var(--gold)),
     hsl(var(--accent))
   );
@@ -107,11 +108,11 @@ h3,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(214 20% 78%);
+  background: hsl(218 18% 30%);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(214 20% 68%);
+  background: hsl(218 18% 40%);
 }
 
 .tabular {
@@ -119,9 +120,21 @@ h3,
   font-family: var(--font-mono);
 }
 
-/* Soft card lift on white */
+/* Subtle top highlight + soft shadow on dark cards */
 .glow-border {
-  box-shadow: 0 1px 2px hsl(215 30% 20% / 0.05), 0 1px 0 hsl(0 0% 100% / 0.5) inset;
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.05), 0 1px 2px hsl(0 0% 0% / 0.3);
+}
+
+/* Recharts tooltip / legend legibility on dark */
+.recharts-default-tooltip {
+  background: hsl(var(--panel)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.recharts-tooltip-label {
+  color: hsl(var(--foreground)) !important;
+}
+.recharts-legend-item-text {
+  color: hsl(var(--muted-foreground)) !important;
 }
 
 /* Range inputs */
@@ -141,7 +154,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 9999px;
   background: hsl(var(--gold));
   border: 2px solid hsl(var(--background));
-  box-shadow: 0 1px 3px hsl(215 40% 20% / 0.3);
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.5);
   cursor: pointer;
   transition: transform 0.1s ease;
 }

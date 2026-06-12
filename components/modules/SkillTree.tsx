@@ -29,10 +29,10 @@ const CATEGORIES: SkillCategory[] = [
 ];
 
 const CAT_COLOR: Record<SkillCategory, string> = {
-  Technical: "bg-[#3d5a80]",
-  Transactions: "bg-[#5b7aa8]",
+  Technical: "bg-[#4f8ae6]",
+  Transactions: "bg-[#7fa8dc]",
   Investing: "bg-accent",
-  Leadership: "bg-[#9c7b30]",
+  Leadership: "bg-[#c2925a]",
   Origination: "bg-gold",
 };
 

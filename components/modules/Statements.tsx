@@ -69,7 +69,7 @@ import {
   Legend,
 } from "recharts";
 
-const PIE_COLORS = ["#14264a", "#c19a4b", "#3d5a80", "#8aa1c1", "#9c7b30", "#5b7aa8"];
+const PIE_COLORS = ["#4f8ae6", "#ddb341", "#7fa8dc", "#a9c6ee", "#c2925a", "#46b6a6"];
 
 function newPeriod(label: string): StatementPeriod {
   return {
@@ -846,10 +846,10 @@ function AnalysisView({ c }: { c: StatementCase }) {
                   contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="l" dataKey="Revenue" fill="#14264a" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="l" dataKey="Revenue" fill="#4f8ae6" radius={[3, 3, 0, 0]} />
                 <Bar yAxisId="l" dataKey="EBITDA" fill="hsl(var(--gold))" radius={[3, 3, 0, 0]} />
                 <Line yAxisId="r" dataKey="EBITDA %" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 3 }} />
-                <Line yAxisId="r" dataKey="Gross %" stroke="#3d5a80" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Line yAxisId="r" dataKey="Gross %" stroke="#46b6a6" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1027,7 +1027,7 @@ function ProjectionView({ c, onChange }: { c: StatementCase; onChange: (c: State
                 <YAxis tickFormatter={(v) => eur(v)} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} width={50} />
                 <Tooltip contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => eurFull(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Revenue" fill="#14264a" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Revenue" fill="#4f8ae6" radius={[3, 3, 0, 0]} />
                 <Line dataKey="EBITDA" stroke="hsl(var(--gold))" strokeWidth={2} dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>

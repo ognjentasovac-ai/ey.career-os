@@ -29,10 +29,10 @@ import {
 } from "recharts";
 
 const COLORS = {
-  base: "#14264a", // navy
-  bonus: "#3d5a80", // steel blue
-  carry: "#c19a4b", // gold
-  coInvestment: "#8aa1c1", // light steel
+  base: "#4f8ae6", // azure
+  bonus: "#7fa8dc", // steel blue
+  carry: "#ddb341", // gold
+  coInvestment: "#a9c6ee", // light steel
 };
 
 export function Compensation() {

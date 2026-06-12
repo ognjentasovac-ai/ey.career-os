@@ -184,9 +184,9 @@ export function Dashboard() {
               <div className="flex flex-col justify-center gap-4">
                 <ScoreBar label="Partner Readiness" value={m.partnerReadiness} color="bg-gold" />
                 <ScoreBar label="Deal Origination" value={m.originationScore} color="bg-accent" />
-                <ScoreBar label="Leadership" value={m.leadershipScore} color="bg-[#3d5a80]" />
-                <ScoreBar label="Technical Mastery" value={m.technicalScore} color="bg-[#7e9cc4]" />
-                <ScoreBar label="Network Strength" value={m.networkScore} color="bg-[#9c7b30]" />
+                <ScoreBar label="Leadership" value={m.leadershipScore} color="bg-[#4f8ae6]" />
+                <ScoreBar label="Technical Mastery" value={m.technicalScore} color="bg-[#a9c6ee]" />
+                <ScoreBar label="Network Strength" value={m.networkScore} color="bg-[#c2925a]" />
               </div>
             </div>
           </CardContent>
