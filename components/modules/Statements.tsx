@@ -102,6 +102,7 @@ function newCase(name: string): StatementCase {
 export function Statements() {
   const { state, setState } = useStore();
   const [selected, setSelected] = useState<string | null>(null);
+  const [libShown, setLibShown] = useState(12);
 
   const cases = state.statementCases;
   const active = cases.find((c) => c.id === selected) || null;
@@ -278,13 +279,14 @@ export function Statements() {
         <div>
           <h2 className="font-display text-lg font-semibold">Company Library</h2>
           <p className="text-xs text-muted-foreground">
-            10 anonymised businesses across sectors · {libraryDoneCount}/
-            {COMPANY_LIBRARY.length} solved. Mix of sectors so you learn the patterns.
+            {COMPANY_LIBRARY.length} anonymised businesses across ~30 sectors ·{" "}
+            {libraryDoneCount}/{COMPANY_LIBRARY.length} solved. Several names per
+            sector so you learn the patterns — a new one is featured every day.
           </p>
         </div>
       </div>
-      <div className="mb-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {COMPANY_LIBRARY.map((tpl, i) => {
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {COMPANY_LIBRARY.slice(0, libShown).map((tpl) => {
           const saved = cases.find((c) => c.id === tpl.id);
           const solved = saved?.revealed;
           const a = analyseCase(tpl);
@@ -295,12 +297,7 @@ export function Statements() {
               onClick={() => openLibraryCompany(tpl)}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10 text-xs font-semibold text-accent">
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <h3 className="text-sm font-semibold">{tpl.name}</h3>
-                </div>
+                <h3 className="text-sm font-semibold">{tpl.name}</h3>
                 {solved ? (
                   <Badge variant="positive">Solved</Badge>
                 ) : (
@@ -326,6 +323,17 @@ export function Statements() {
           );
         })}
       </div>
+      {libShown < COMPANY_LIBRARY.length && (
+        <div className="mb-8 mt-4 flex justify-center">
+          <Button
+            variant="secondary"
+            onClick={() => setLibShown((n) => Math.min(n + 24, COMPANY_LIBRARY.length))}
+          >
+            Show more ({COMPANY_LIBRARY.length - libShown} left)
+          </Button>
+        </div>
+      )}
+      {libShown >= COMPANY_LIBRARY.length && <div className="mb-8" />}
 
       <div className="mb-3 flex items-end justify-between">
         <h2 className="font-display text-lg font-semibold">My Readings</h2>

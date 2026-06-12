@@ -596,7 +596,145 @@ const SPECS: CompanySpec[] = [
   },
 ];
 
-export const COMPANY_LIBRARY: StatementCase[] = SPECS.map(generate);
+/* ----------------------------------------------------------------------
+ * Procedural archetypes — generate ~90 more companies across many sectors,
+ * each with a realistic sector "fingerprint" plus deterministic variation,
+ * so there are several examples per sector to learn the patterns.
+ * -------------------------------------------------------------------- */
+
+const WINTER = [10, 9, 8, 7, 7, 7, 7, 7, 8, 8, 9, 11];
+const HARVEST = [7, 7, 8, 8, 8, 9, 9, 10, 11, 9, 7, 7];
+const BUILD = [7, 7, 8, 9, 10, 11, 10, 9, 9, 8, 7, 5];
+
+interface Arch {
+  key: string;
+  sector: string;
+  business: string;
+  seasonality: number[];
+  segs: Seg[];
+  gmMin: number;
+  gmMax: number;
+  sal: number;
+  tr: number;
+  mk: number;
+  ox: number;
+  da: number;
+  int: number;
+  tax: number;
+  cash: number;
+  dso: number;
+  dio: number;
+  dpo: number;
+  ppe: number;
+  intang: number;
+  oCA: number;
+  oNCA: number;
+  oCL: number;
+  sDebt: number;
+  lDebt: number;
+  oLTL: number;
+  revMin: number;
+  revMax: number;
+  growth: number[][];
+  count: number;
+}
+
+const B = 1_000_000_000;
+
+const ARCHETYPES: Arch[] = [
+  { key: "semis", sector: "Technology — Semiconductors", business: "Designs and/or fabricates semiconductor chips. Cyclical demand, high R&D and capex, large inventory.", seasonality: FLAT, segs: [{ name: "Compute & data centre", pct: 0.4 }, { name: "Mobile", pct: 0.27 }, { name: "Automotive & industrial", pct: 0.2 }, { name: "Other", pct: 0.13 }], gmMin: 0.45, gmMax: 0.58, sal: 0.12, tr: 0.01, mk: 0.02, ox: 0.06, da: 0.08, int: 0.01, tax: 0.13, cash: 0.25, dso: 50, dio: 90, dpo: 45, ppe: 0.55, intang: 0.15, oCA: 0.05, oNCA: 0.15, oCL: 0.08, sDebt: 0.03, lDebt: 0.2, oLTL: 0.08, revMin: 4 * B, revMax: 60 * B, growth: [[0.2, 0.3, -0.12, 0.15], [0.1, 0.25, 0.05, -0.05]], count: 4 },
+  { key: "meddev", sector: "Healthcare — Medical Devices", business: "Manufactures medical devices and equipment sold to hospitals and clinics. High margin, regulated, M&A-driven intangibles.", seasonality: FLAT, segs: [{ name: "Surgical", pct: 0.35 }, { name: "Diagnostics", pct: 0.3 }, { name: "Cardiovascular", pct: 0.2 }, { name: "Other", pct: 0.15 }], gmMin: 0.58, gmMax: 0.68, sal: 0.16, tr: 0.01, mk: 0.1, ox: 0.05, da: 0.04, int: 0.02, tax: 0.15, cash: 0.1, dso: 65, dio: 110, dpo: 50, ppe: 0.2, intang: 0.5, oCA: 0.05, oNCA: 0.15, oCL: 0.1, sDebt: 0.03, lDebt: 0.35, oLTL: 0.12, revMin: 2 * B, revMax: 30 * B, growth: [[0.07, 0.08, 0.06, 0.07], [0.1, 0.09, 0.08, 0.06]], count: 4 },
+  { key: "autoparts", sector: "Consumer Discretionary — Auto Components", business: "Supplies parts and systems to vehicle manufacturers. Mid-teens margin, capital-intensive, cyclical with auto production.", seasonality: AUTO, segs: [{ name: "Powertrain", pct: 0.35 }, { name: "Electronics", pct: 0.3 }, { name: "Interiors", pct: 0.2 }, { name: "Aftermarket", pct: 0.15 }], gmMin: 0.17, gmMax: 0.25, sal: 0.07, tr: 0.03, mk: 0.01, ox: 0.03, da: 0.05, int: 0.015, tax: 0.22, cash: 0.08, dso: 55, dio: 45, dpo: 60, ppe: 0.4, intang: 0.1, oCA: 0.05, oNCA: 0.1, oCL: 0.08, sDebt: 0.05, lDebt: 0.25, oLTL: 0.1, revMin: 2 * B, revMax: 40 * B, growth: [[0.05, 0.08, -0.04, 0.06]], count: 4 },
+  { key: "telecom", sector: "Communications — Telecom Operator", business: "Provides mobile and fixed-line connectivity. Huge network assets, high depreciation and leverage, stable cash flows.", seasonality: FLAT, segs: [{ name: "Mobile", pct: 0.55 }, { name: "Fixed broadband", pct: 0.27 }, { name: "Enterprise", pct: 0.13 }, { name: "Other", pct: 0.05 }], gmMin: 0.55, gmMax: 0.62, sal: 0.1, tr: 0.02, mk: 0.06, ox: 0.1, da: 0.18, int: 0.05, tax: 0.22, cash: 0.05, dso: 40, dio: 5, dpo: 60, ppe: 0.85, intang: 0.55, oCA: 0.05, oNCA: 0.1, oCL: 0.15, sDebt: 0.08, lDebt: 0.85, oLTL: 0.25, revMin: 5 * B, revMax: 50 * B, growth: [[0.01, 0.02, 0.01, 0.0], [0.03, 0.02, 0.02, 0.01]], count: 4 },
+  { key: "utility", sector: "Utilities — Power & Gas", business: "Regulated generation and distribution of electricity/gas. Enormous asset base, high leverage, stable regulated returns.", seasonality: WINTER, segs: [{ name: "Networks", pct: 0.45 }, { name: "Generation", pct: 0.3 }, { name: "Retail supply", pct: 0.2 }, { name: "Renewables", pct: 0.05 }], gmMin: 0.3, gmMax: 0.4, sal: 0.08, tr: 0.03, mk: 0.005, ox: 0.08, da: 0.12, int: 0.06, tax: 0.2, cash: 0.04, dso: 45, dio: 20, dpo: 50, ppe: 1.5, intang: 0.1, oCA: 0.05, oNCA: 0.15, oCL: 0.1, sDebt: 0.1, lDebt: 1.1, oLTL: 0.3, revMin: 5 * B, revMax: 40 * B, growth: [[0.02, 0.03, 0.01, 0.02]], count: 4 },
+  { key: "oilgas", sector: "Energy — Oil & Gas E&P", business: "Explores for and produces crude oil and natural gas. Commodity-priced, very volatile earnings, capital-intensive, depletion charges.", seasonality: FLAT, segs: [{ name: "Upstream — oil", pct: 0.55 }, { name: "Upstream — gas", pct: 0.25 }, { name: "Trading", pct: 0.12 }, { name: "Other", pct: 0.08 }], gmMin: 0.32, gmMax: 0.5, sal: 0.05, tr: 0.03, mk: 0.002, ox: 0.06, da: 0.18, int: 0.03, tax: 0.32, cash: 0.08, dso: 35, dio: 15, dpo: 40, ppe: 1.2, intang: 0.05, oCA: 0.05, oNCA: 0.1, oCL: 0.1, sDebt: 0.05, lDebt: 0.45, oLTL: 0.25, revMin: 5 * B, revMax: 80 * B, growth: [[0.5, 0.2, -0.3, 0.1], [-0.2, 0.6, 0.1, -0.1]], count: 4 },
+  { key: "chemicals", sector: "Materials — Chemicals", business: "Produces commodity and specialty chemicals. Cyclical, energy-sensitive, mid-twenties gross margin, capital-intensive.", seasonality: STEEL, segs: [{ name: "Performance materials", pct: 0.4 }, { name: "Industrial chemicals", pct: 0.3 }, { name: "Agro", pct: 0.18 }, { name: "Other", pct: 0.12 }], gmMin: 0.2, gmMax: 0.28, sal: 0.08, tr: 0.05, mk: 0.01, ox: 0.04, da: 0.06, int: 0.02, tax: 0.22, cash: 0.07, dso: 50, dio: 60, dpo: 50, ppe: 0.55, intang: 0.15, oCA: 0.05, oNCA: 0.12, oCL: 0.08, sDebt: 0.05, lDebt: 0.3, oLTL: 0.12, revMin: 5 * B, revMax: 60 * B, growth: [[0.1, 0.05, -0.06, 0.03]], count: 4 },
+  { key: "machinery", sector: "Industrials — Machinery & Capital Goods", business: "Builds industrial machinery and equipment with a large order book and aftermarket. Long working-capital cycle, service revenue.", seasonality: AUTO, segs: [{ name: "Equipment", pct: 0.6 }, { name: "Aftermarket & service", pct: 0.28 }, { name: "Digital", pct: 0.07 }, { name: "Other", pct: 0.05 }], gmMin: 0.28, gmMax: 0.36, sal: 0.12, tr: 0.03, mk: 0.03, ox: 0.06, da: 0.04, int: 0.015, tax: 0.24, cash: 0.1, dso: 70, dio: 90, dpo: 55, ppe: 0.25, intang: 0.3, oCA: 0.08, oNCA: 0.1, oCL: 0.12, sDebt: 0.05, lDebt: 0.25, oLTL: 0.12, revMin: 3 * B, revMax: 50 * B, growth: [[0.06, 0.08, -0.02, 0.05]], count: 4 },
+  { key: "construction", sector: "Industrials — Construction & Engineering", business: "Delivers large construction and infrastructure projects. Very low margin, milestone billing, advances from clients (negative WC).", seasonality: BUILD, segs: [{ name: "Infrastructure", pct: 0.45 }, { name: "Buildings", pct: 0.3 }, { name: "Energy & industrial", pct: 0.18 }, { name: "Concessions", pct: 0.07 }], gmMin: 0.1, gmMax: 0.16, sal: 0.06, tr: 0.02, mk: 0.005, ox: 0.03, da: 0.02, int: 0.01, tax: 0.22, cash: 0.12, dso: 80, dio: 30, dpo: 70, ppe: 0.15, intang: 0.08, oCA: 0.15, oNCA: 0.08, oCL: 0.2, sDebt: 0.05, lDebt: 0.12, oLTL: 0.08, revMin: 3 * B, revMax: 40 * B, growth: [[0.08, 0.05, 0.04, 0.06]], count: 4 },
+  { key: "hotels", sector: "Consumer Discretionary — Hotels & Leisure", business: "Operates hotels and leisure venues. People-heavy, real-estate-heavy, summer peak, recovered strongly post-2020.", seasonality: SUMMER, segs: [{ name: "Owned & leased hotels", pct: 0.5 }, { name: "Managed & franchised", pct: 0.3 }, { name: "Food & beverage", pct: 0.12 }, { name: "Other", pct: 0.08 }], gmMin: 0.3, gmMax: 0.4, sal: 0.25, tr: 0.02, mk: 0.05, ox: 0.1, da: 0.08, int: 0.04, tax: 0.2, cash: 0.08, dso: 20, dio: 5, dpo: 35, ppe: 0.9, intang: 0.2, oCA: 0.05, oNCA: 0.1, oCL: 0.12, sDebt: 0.06, lDebt: 0.55, oLTL: 0.2, revMin: 1 * B, revMax: 20 * B, growth: [[-0.5, 0.65, 0.4, 0.1]], count: 4 },
+  { key: "logistics", sector: "Industrials — Logistics & Shipping", business: "Moves freight by sea/road/air. Fuel-heavy variable cost, asset-heavy fleet, freight-rate cyclicality.", seasonality: FLAT, segs: [{ name: "Ocean freight", pct: 0.55 }, { name: "Logistics & contract", pct: 0.25 }, { name: "Terminals", pct: 0.12 }, { name: "Other", pct: 0.08 }], gmMin: 0.15, gmMax: 0.24, sal: 0.1, tr: 0.08, mk: 0.01, ox: 0.05, da: 0.07, int: 0.025, tax: 0.18, cash: 0.1, dso: 45, dio: 5, dpo: 40, ppe: 0.65, intang: 0.15, oCA: 0.05, oNCA: 0.1, oCL: 0.1, sDebt: 0.06, lDebt: 0.4, oLTL: 0.15, revMin: 3 * B, revMax: 50 * B, growth: [[0.2, 0.4, -0.3, 0.05]], count: 4 },
+  { key: "media", sector: "Communications — Media & Entertainment", business: "Creates and distributes content across film, TV and streaming. Content investment (intangibles), advertising + subscription mix.", seasonality: HOLIDAY_Q4, segs: [{ name: "Streaming & subscription", pct: 0.4 }, { name: "Advertising", pct: 0.3 }, { name: "Content licensing", pct: 0.2 }, { name: "Other", pct: 0.1 }], gmMin: 0.4, gmMax: 0.5, sal: 0.15, tr: 0.01, mk: 0.1, ox: 0.08, da: 0.05, int: 0.03, tax: 0.2, cash: 0.08, dso: 60, dio: 20, dpo: 50, ppe: 0.2, intang: 0.7, oCA: 0.08, oNCA: 0.15, oCL: 0.12, sDebt: 0.05, lDebt: 0.45, oLTL: 0.15, revMin: 2 * B, revMax: 40 * B, growth: [[0.08, 0.1, 0.05, 0.04]], count: 4 },
+  { key: "agri", sector: "Consumer Staples — Agribusiness & Food Production", business: "Grows, processes and trades agricultural commodities and food. Thin margins, large inventories, harvest seasonality.", seasonality: HARVEST, segs: [{ name: "Grains & oilseeds", pct: 0.4 }, { name: "Processed food", pct: 0.3 }, { name: "Animal nutrition", pct: 0.2 }, { name: "Other", pct: 0.1 }], gmMin: 0.12, gmMax: 0.18, sal: 0.06, tr: 0.04, mk: 0.02, ox: 0.04, da: 0.04, int: 0.02, tax: 0.2, cash: 0.05, dso: 35, dio: 55, dpo: 35, ppe: 0.35, intang: 0.1, oCA: 0.08, oNCA: 0.1, oCL: 0.08, sDebt: 0.1, lDebt: 0.25, oLTL: 0.1, revMin: 3 * B, revMax: 60 * B, growth: [[0.06, 0.04, 0.05, 0.03]], count: 4 },
+  { key: "qsr", sector: "Consumer Discretionary — Restaurants / QSR", business: "Operates and franchises a restaurant chain. Low food COGS but heavy labour and occupancy, franchise royalties, stable growth.", seasonality: FLAT, segs: [{ name: "Company restaurants", pct: 0.55 }, { name: "Franchise royalties", pct: 0.3 }, { name: "Delivery", pct: 0.1 }, { name: "Other", pct: 0.05 }], gmMin: 0.62, gmMax: 0.72, sal: 0.28, tr: 0.02, mk: 0.04, ox: 0.15, da: 0.05, int: 0.03, tax: 0.22, cash: 0.06, dso: 5, dio: 8, dpo: 30, ppe: 0.45, intang: 0.3, oCA: 0.03, oNCA: 0.1, oCL: 0.1, sDebt: 0.05, lDebt: 0.45, oLTL: 0.2, revMin: 1 * B, revMax: 25 * B, growth: [[0.07, 0.08, 0.06, 0.05]], count: 4 },
+  { key: "realestate", sector: "Real Estate — Property Operating", business: "Owns and rents a portfolio of investment property. Very asset-heavy, highly levered, stable rental income, high interest cost.", seasonality: FLAT, segs: [{ name: "Office", pct: 0.35 }, { name: "Retail", pct: 0.3 }, { name: "Residential", pct: 0.22 }, { name: "Logistics", pct: 0.13 }], gmMin: 0.65, gmMax: 0.75, sal: 0.05, tr: 0.005, mk: 0.01, ox: 0.15, da: 0.05, int: 0.2, tax: 0.1, cash: 0.05, dso: 20, dio: 0, dpo: 20, ppe: 6.0, intang: 0.05, oCA: 0.05, oNCA: 0.2, oCL: 0.1, sDebt: 0.3, lDebt: 4.0, oLTL: 0.3, revMin: 1 * B, revMax: 10 * B, growth: [[0.05, 0.06, 0.04, 0.05]], count: 4 },
+  { key: "itservices", sector: "Technology — IT Services & Consulting", business: "Delivers IT consulting, integration and managed services. People business (cost = staff), asset-light, high receivables.", seasonality: FLAT, segs: [{ name: "Consulting", pct: 0.4 }, { name: "Managed services", pct: 0.35 }, { name: "Cloud & engineering", pct: 0.18 }, { name: "Other", pct: 0.07 }], gmMin: 0.3, gmMax: 0.4, sal: 0.18, tr: 0.01, mk: 0.03, ox: 0.05, da: 0.02, int: 0.01, tax: 0.24, cash: 0.1, dso: 80, dio: 0, dpo: 30, ppe: 0.1, intang: 0.25, oCA: 0.08, oNCA: 0.08, oCL: 0.15, sDebt: 0.03, lDebt: 0.15, oLTL: 0.1, revMin: 2 * B, revMax: 40 * B, growth: [[0.08, 0.1, 0.07, 0.08]], count: 4 },
+  { key: "hcdist", sector: "Healthcare — Drug & Medical Distribution", business: "Distributes pharmaceuticals and medical supplies at huge scale. Razor-thin gross margin, enormous revenue, fast inventory turns.", seasonality: FLAT, segs: [{ name: "Pharma distribution", pct: 0.7 }, { name: "Medical & specialty", pct: 0.2 }, { name: "Services", pct: 0.1 }], gmMin: 0.04, gmMax: 0.07, sal: 0.015, tr: 0.01, mk: 0.002, ox: 0.012, da: 0.005, int: 0.005, tax: 0.22, cash: 0.03, dso: 30, dio: 25, dpo: 40, ppe: 0.04, intang: 0.06, oCA: 0.04, oNCA: 0.04, oCL: 0.06, sDebt: 0.03, lDebt: 0.06, oLTL: 0.04, revMin: 30 * B, revMax: 250 * B, growth: [[0.06, 0.07, 0.05, 0.06]], count: 5 },
+  { key: "aerospace", sector: "Industrials — Aerospace & Defense", business: "Designs and builds aircraft, systems and defense equipment. Long programmes, big order backlog, large inventory and intangibles.", seasonality: FLAT, segs: [{ name: "Commercial aerospace", pct: 0.45 }, { name: "Defense", pct: 0.35 }, { name: "Space & systems", pct: 0.12 }, { name: "Services", pct: 0.08 }], gmMin: 0.15, gmMax: 0.22, sal: 0.1, tr: 0.02, mk: 0.02, ox: 0.04, da: 0.04, int: 0.02, tax: 0.18, cash: 0.08, dso: 60, dio: 100, dpo: 55, ppe: 0.25, intang: 0.4, oCA: 0.1, oNCA: 0.12, oCL: 0.15, sDebt: 0.05, lDebt: 0.35, oLTL: 0.15, revMin: 5 * B, revMax: 70 * B, growth: [[0.05, 0.06, 0.04, 0.05]], count: 4 },
+  { key: "packagedfood", sector: "Consumer Staples — Branded Packaged Food", business: "Owns branded packaged-food products sold through retail. Steady low-growth, brand intangibles, heavy marketing, leverage.", seasonality: FLAT, segs: [{ name: "Snacks", pct: 0.35 }, { name: "Meals & sauces", pct: 0.3 }, { name: "Dairy", pct: 0.2 }, { name: "Other", pct: 0.15 }], gmMin: 0.3, gmMax: 0.4, sal: 0.1, tr: 0.05, mk: 0.08, ox: 0.05, da: 0.03, int: 0.03, tax: 0.22, cash: 0.05, dso: 35, dio: 50, dpo: 60, ppe: 0.3, intang: 0.55, oCA: 0.05, oNCA: 0.15, oCL: 0.1, sDebt: 0.08, lDebt: 0.55, oLTL: 0.15, revMin: 5 * B, revMax: 50 * B, growth: [[0.04, 0.05, 0.03, 0.04]], count: 4 },
+  { key: "specialtyretail", sector: "Consumer Discretionary — Specialty Retail", business: "Runs a chain of electronics/home specialty stores plus e-commerce. Mid-twenties margin, seasonal Q4 peak, inventory-heavy.", seasonality: HOLIDAY_Q4, segs: [{ name: "Electronics", pct: 0.45 }, { name: "Home & appliances", pct: 0.3 }, { name: "Services", pct: 0.15 }, { name: "Other", pct: 0.1 }], gmMin: 0.25, gmMax: 0.35, sal: 0.12, tr: 0.03, mk: 0.04, ox: 0.06, da: 0.03, int: 0.015, tax: 0.22, cash: 0.07, dso: 8, dio: 60, dpo: 55, ppe: 0.2, intang: 0.1, oCA: 0.05, oNCA: 0.08, oCL: 0.1, sDebt: 0.05, lDebt: 0.15, oLTL: 0.15, revMin: 3 * B, revMax: 40 * B, growth: [[0.06, 0.05, -0.02, 0.04]], count: 4 },
+  { key: "ecommerce", sector: "Consumer Discretionary — E-commerce", business: "Online retail marketplace with fulfilment and third-party sellers. High growth, fulfilment-heavy, negative working capital, Q4 peak.", seasonality: HOLIDAY_Q4, segs: [{ name: "First-party retail", pct: 0.5 }, { name: "Third-party services", pct: 0.25 }, { name: "Advertising", pct: 0.13 }, { name: "Subscriptions & cloud", pct: 0.12 }], gmMin: 0.25, gmMax: 0.42, sal: 0.12, tr: 0.06, mk: 0.06, ox: 0.06, da: 0.05, int: 0.01, tax: 0.16, cash: 0.18, dso: 20, dio: 35, dpo: 80, ppe: 0.35, intang: 0.1, oCA: 0.05, oNCA: 0.12, oCL: 0.18, sDebt: 0.03, lDebt: 0.2, oLTL: 0.15, revMin: 5 * B, revMax: 120 * B, growth: [[0.3, 0.25, 0.15, 0.12]], count: 5 },
+  { key: "buildmat", sector: "Materials — Building Materials", business: "Produces cement, aggregates and building products. Heavy, bulky (transport-intensive), capital-intensive, construction-cycle linked.", seasonality: BUILD, segs: [{ name: "Cement", pct: 0.4 }, { name: "Aggregates", pct: 0.3 }, { name: "Ready-mix & products", pct: 0.22 }, { name: "Other", pct: 0.08 }], gmMin: 0.25, gmMax: 0.33, sal: 0.08, tr: 0.06, mk: 0.01, ox: 0.04, da: 0.06, int: 0.02, tax: 0.22, cash: 0.06, dso: 50, dio: 70, dpo: 50, ppe: 0.6, intang: 0.15, oCA: 0.05, oNCA: 0.1, oCL: 0.08, sDebt: 0.05, lDebt: 0.3, oLTL: 0.12, revMin: 3 * B, revMax: 40 * B, growth: [[0.07, 0.06, 0.04, 0.05]], count: 4 },
+];
+
+function mulberry32(seed: number): () => number {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function fromArchetype(a: Arch, k: number): CompanySpec {
+  const rng = mulberry32(hashStr(a.key) + k * 2654435761);
+  const jr = (c: number, rel = 0.12) => c * (1 + (rng() * 2 - 1) * rel);
+  const revenue0 = a.revMin * Math.pow(a.revMax / a.revMin, rng());
+  const gp = a.growth[Math.floor(rng() * a.growth.length)];
+  const growths = gp.map((g) => g + (rng() * 2 - 1) * 0.03);
+  const gm = a.gmMin + (a.gmMax - a.gmMin) * rng();
+  return {
+    id: `co_${a.key}_${k}`,
+    hiddenName: "Mystery Co.",
+    sector: a.sector,
+    business: a.business,
+    unit: "",
+    startYear: 2020,
+    revenue0: Math.round(revenue0),
+    growths,
+    grossMargin: gm,
+    salariesPct: jr(a.sal),
+    transportPct: jr(a.tr),
+    marketingPct: jr(a.mk),
+    otherOpexPct: jr(a.ox),
+    daPct: jr(a.da),
+    interestPct: jr(a.int),
+    taxRate: a.tax,
+    cashPct: jr(a.cash),
+    dso: jr(a.dso),
+    dio: jr(a.dio),
+    dpo: jr(a.dpo),
+    ppePct: jr(a.ppe),
+    intangiblesPct: jr(a.intang),
+    otherCAPct: jr(a.oCA),
+    otherNCAPct: jr(a.oNCA),
+    otherCLPct: jr(a.oCL),
+    shortDebtPct: jr(a.sDebt),
+    longDebtPct: jr(a.lDebt),
+    otherLTLPct: jr(a.oLTL),
+    seasonality: a.seasonality,
+    segments: a.segs,
+  };
+}
+
+const GENERATED: CompanySpec[] = [];
+for (const a of ARCHETYPES) {
+  for (let k = 0; k < a.count; k++) GENERATED.push(fromArchetype(a, k));
+}
+
+// 10 hand-tuned + ~90 procedural = 100 companies, renumbered #1..#N.
+export const COMPANY_LIBRARY: StatementCase[] = [...SPECS, ...GENERATED]
+  .map(generate)
+  .map((c, i) => ({ ...c, name: `Mystery Co. #${i + 1}` }));
 
 export function getDailyCompanyIndex(): number {
   const epochDay = Math.floor(Date.now() / 86_400_000);
