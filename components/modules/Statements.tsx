@@ -12,10 +12,21 @@ import {
   Layers3,
   CalendarPlus,
   Flame,
+  ExternalLink,
+  Trophy,
+  Globe,
+  Lock,
+  Sparkles,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { StatementCase, StatementPeriod, PLData, BSData } from "@/lib/types";
 import { uid, todayISO, eur, eurFull, formatDate } from "@/lib/utils";
+import {
+  COMPANY_LIBRARY,
+  DATA_SOURCES,
+  getDailyCompany,
+  getDailyCompanyIndex,
+} from "@/lib/company-library";
 import {
   analyseCase,
   analysePeriod,
@@ -96,6 +107,12 @@ export function Statements() {
   const active = cases.find((c) => c.id === selected) || null;
   const streak = computeStreak(cases);
   const proficiency = statementProficiency(cases);
+  const daily = getDailyCompany();
+  const dailyNumber = getDailyCompanyIndex() + 1;
+  const dailyDone = cases.some((c) => c.id === daily.id && c.revealed);
+  const libraryDoneCount = COMPANY_LIBRARY.filter((t) =>
+    cases.some((c) => c.id === t.id && c.revealed)
+  ).length;
 
   function createCase() {
     const c = newCase(`Business ${String.fromCharCode(65 + cases.length)}`);
@@ -116,6 +133,16 @@ export function Statements() {
       statementCases: prev.statementCases.filter((c) => c.id !== id),
     }));
     setSelected(null);
+  }
+
+  function openLibraryCompany(tpl: StatementCase) {
+    setState((prev) => {
+      if (prev.statementCases.some((c) => c.id === tpl.id)) return prev;
+      const copy = JSON.parse(JSON.stringify(tpl)) as StatementCase;
+      copy.createdAt = todayISO();
+      return { ...prev, statementCases: [copy, ...prev.statementCases] };
+    });
+    setSelected(tpl.id);
   }
 
   if (active) {
@@ -178,6 +205,134 @@ export function Statements() {
         <KpiCard label="Open cases" value={cases.length - streak.completed} sub="to analyse & reveal" />
       </div>
 
+      {/* Company of the day */}
+      <Card className="mb-6 overflow-hidden border-gold/40">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold">
+              <Trophy size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-gold">
+                  Company of the Day
+                </span>
+                <Badge variant={dailyDone ? "positive" : "warning"}>
+                  {dailyDone ? "Solved ✓" : "Unsolved"}
+                </Badge>
+              </div>
+              <h3 className="mt-1 font-display text-lg font-semibold">
+                Today's mystery business · #{dailyNumber} of {COMPANY_LIBRARY.length}
+              </h3>
+              <p className="mt-1 max-w-xl text-xs text-muted-foreground">
+                Read its P&amp;L, balance sheet and seasonality (5 consolidated years).
+                Decide what it does, which sector it is, whether to buy it and at what
+                price — then reveal. Identity is hidden until you do.
+              </p>
+            </div>
+          </div>
+          <Button variant="gold" onClick={() => openLibraryCompany(daily)}>
+            <Sparkles size={15} /> Analyse today's company
+          </Button>
+        </div>
+      </Card>
+
+      {/* Where to find official statements */}
+      <Card className="mb-6">
+        <CardHeader className="flex-row items-center gap-2">
+          <Globe size={16} className="text-accent" />
+          <CardTitle>Where to find official financial statements</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Pull real filings for the prior years, then build your own 3-year
+            projection in the Projection tab — the analyst's job.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {DATA_SOURCES.map((s) => (
+              <a
+                key={s.url}
+                href={s.url}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-start gap-3 rounded-md border border-border bg-elevated/50 p-3 transition-colors hover:border-accent/40 hover:bg-elevated"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{s.name}</span>
+                    <Badge>{s.region}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                    {s.note}
+                  </p>
+                </div>
+                <ExternalLink size={14} className="mt-0.5 shrink-0 text-muted-foreground group-hover:text-accent" />
+              </a>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Company library — the guessing deck */}
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h2 className="font-display text-lg font-semibold">Company Library</h2>
+          <p className="text-xs text-muted-foreground">
+            10 anonymised businesses across sectors · {libraryDoneCount}/
+            {COMPANY_LIBRARY.length} solved. Mix of sectors so you learn the patterns.
+          </p>
+        </div>
+      </div>
+      <div className="mb-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {COMPANY_LIBRARY.map((tpl, i) => {
+          const saved = cases.find((c) => c.id === tpl.id);
+          const solved = saved?.revealed;
+          const a = analyseCase(tpl);
+          return (
+            <Card
+              key={tpl.id}
+              className="hover-lift cursor-pointer p-5"
+              onClick={() => openLibraryCompany(tpl)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10 text-xs font-semibold text-accent">
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <h3 className="text-sm font-semibold">{tpl.name}</h3>
+                </div>
+                {solved ? (
+                  <Badge variant="positive">Solved</Badge>
+                ) : (
+                  <Lock size={13} className="text-muted-foreground" />
+                )}
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <Mini label="Latest rev" value={a.latest ? eur(a.latest.revenue) : "—"} />
+                <Mini label="EBITDA %" value={a.latest ? `${a.latest.ebitdaMargin.toFixed(0)}%` : "—"} />
+                <Mini label="5y CAGR" value={`${a.revenueCagr.toFixed(0)}%`} />
+              </div>
+              <div className="mt-3 rounded-md bg-elevated px-3 py-2 text-xs text-muted-foreground">
+                {solved ? (
+                  <>
+                    <span>Sector: </span>
+                    <span className="font-medium text-foreground">{saved?.actualSector}</span>
+                  </>
+                ) : (
+                  "Sector hidden — open to read & guess"
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <div className="mb-3 flex items-end justify-between">
+        <h2 className="font-display text-lg font-semibold">My Readings</h2>
+        <Button size="sm" variant="secondary" onClick={createCase}>
+          <Plus size={14} /> New blank reading
+        </Button>
+      </div>
       {cases.length === 0 ? (
         <EmptyState
           message="No readings yet. Start your first business analysis."
@@ -985,42 +1140,77 @@ function QuizView({ c, onChange }: { c: StatementCase; onChange: (c: StatementCa
         </Card>
       ))}
 
-      {/* Reveal sector */}
-      <Card className="border-gold/30">
+      {/* The verdict & the reveal */}
+      <Card className="border-gold/40">
         <CardHeader>
-          <CardTitle className="text-gold">The reveal — score yourself</CardTitle>
+          <CardTitle className="text-gold">Your verdict &amp; the reveal</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <Field label="Your sector guess">
-            <Input value={c.guessSector} onChange={(e) => onChange({ ...c, guessSector: e.target.value })} />
-          </Field>
-          <Field label="Actual sector">
-            <Input value={c.actualSector} onChange={(e) => onChange({ ...c, actualSector: e.target.value })} />
-          </Field>
-          <Field label="Actual business / company">
-            <Input value={c.actualBusiness} onChange={(e) => onChange({ ...c, actualBusiness: e.target.value })} />
-          </Field>
-          <Field label={`Self-assessed score: ${c.score}/100`}>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={c.score}
-              onChange={(e) => onChange({ ...c, score: +e.target.value })}
-              className="w-full"
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Your sector guess">
+              <Input
+                value={c.guessSector}
+                onChange={(e) => onChange({ ...c, guessSector: e.target.value })}
+                placeholder="e.g. Industrials — Manufacturing"
+              />
+            </Field>
+            <Field label={`Self-assessed score: ${c.score}/100`}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={c.score}
+                onChange={(e) => onChange({ ...c, score: +e.target.value })}
+                className="w-full"
+              />
+            </Field>
+          </div>
+          <Field label="Your call — BUY or PASS, at what price / EV-EBITDA multiple, and what does the business actually do?">
+            <Textarea
+              value={c.notes}
+              onChange={(e) => onChange({ ...c, notes: e.target.value })}
+              placeholder="My verdict: …  Valuation: …  Business: …"
             />
           </Field>
-          <Field label="What you learned / what to remember" className="md:col-span-2">
-            <Textarea value={c.notes} onChange={(e) => onChange({ ...c, notes: e.target.value })} />
-          </Field>
-          <div className="md:col-span-2">
-            <Button
-              variant={c.revealed ? "secondary" : "gold"}
-              onClick={() => onChange({ ...c, revealed: !c.revealed })}
-            >
-              {c.revealed ? "Mark as open again" : "Mark reading complete"}
-            </Button>
-          </div>
+
+          {!c.revealed ? (
+            <div className="rounded-md border border-dashed border-gold/50 bg-gold/5 p-4 text-center">
+              <p className="mb-3 text-xs text-muted-foreground">
+                Commit to your guess and verdict above — then reveal the truth.
+              </p>
+              <Button variant="gold" onClick={() => onChange({ ...c, revealed: true })}>
+                <Eye size={14} /> Reveal the answer
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3 rounded-md border border-gold/40 bg-gold/5 p-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Actual sector">
+                  <Input
+                    value={c.actualSector}
+                    onChange={(e) => onChange({ ...c, actualSector: e.target.value })}
+                  />
+                </Field>
+                <Field label="Actual business">
+                  <Input
+                    value={c.actualBusiness}
+                    onChange={(e) => onChange({ ...c, actualBusiness: e.target.value })}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  Your guess:{" "}
+                  <span className="font-medium text-foreground">{c.guessSector || "—"}</span>{" "}
+                  · Actual:{" "}
+                  <span className="font-medium text-gold">{c.actualSector || "—"}</span>
+                </span>
+                <Button variant="secondary" size="sm" onClick={() => onChange({ ...c, revealed: false })}>
+                  Hide answer
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
