@@ -199,22 +199,244 @@ function buildBridge(prior: StatementPeriod, latest: StatementPeriod): EbitdaBri
   };
 }
 
+export function yearOf(label: string): number {
+  const m = label.match(/\d{4}/);
+  return m ? +m[0] : 0;
+}
+
 export function analyseCase(c: StatementCase): CaseAnalysis {
-  const periods = c.periods.map(analysePeriod);
-  const latest = periods.length ? periods[periods.length - 1] : null;
-  const prior = periods.length > 1 ? periods[periods.length - 2] : null;
-  const n = periods.length;
+  const sorted = [...c.periods].sort((a, b) => yearOf(a.label) - yearOf(b.label));
+  const actualP = sorted.filter((p) => !p.projected);
+  const periods = sorted.map(analysePeriod); // all (incl. projected) for charts
+  const actuals = actualP.map(analysePeriod);
+  const latest = actuals.length
+    ? actuals[actuals.length - 1]
+    : periods.length
+    ? periods[periods.length - 1]
+    : null;
+  const prior = actuals.length > 1 ? actuals[actuals.length - 2] : null;
+  const n = actuals.length;
   const revenueCagr =
-    n > 1 ? cagr(periods[0].revenue, periods[n - 1].revenue, n - 1) : 0;
+    n > 1 ? cagr(actuals[0].revenue, actuals[n - 1].revenue, n - 1) : 0;
   const ebitdaCagr =
-    n > 1 ? cagr(periods[0].ebitda, periods[n - 1].ebitda, n - 1) : 0;
+    n > 1 ? cagr(actuals[0].ebitda, actuals[n - 1].ebitda, n - 1) : 0;
   const marginDelta =
-    n > 1 ? periods[n - 1].ebitdaMargin - periods[0].ebitdaMargin : 0;
+    n > 1 ? actuals[n - 1].ebitdaMargin - actuals[0].ebitdaMargin : 0;
   const bridge =
-    c.periods.length > 1
-      ? buildBridge(c.periods[c.periods.length - 2], c.periods[c.periods.length - 1])
+    actualP.length > 1
+      ? buildBridge(actualP[actualP.length - 2], actualP[actualP.length - 1])
       : null;
   return { periods, latest, prior, revenueCagr, ebitdaCagr, marginDelta, bridge };
+}
+
+/**
+ * Analyst-style 3-statement projection: extends the actual periods by `years`
+ * with an integrated, balancing model. Revenue grows at the historical CAGR
+ * (clamped); margins, cost ratios and working-capital days are held; debt is
+ * held flat; equity rolls forward by retained earnings; cash is the balancing
+ * plug — so the projected balance sheet always balances and the derived cash
+ * flow reconciles exactly.
+ */
+export function projectPeriods(
+  allPeriods: StatementPeriod[],
+  years = 3
+): StatementPeriod[] {
+  const actuals = allPeriods
+    .filter((p) => !p.projected)
+    .sort((a, b) => yearOf(a.label) - yearOf(b.label));
+  if (actuals.length < 1) return [];
+  const L = actuals[actuals.length - 1];
+  const a = analysePeriod(L);
+  const rev0 = a.revenue || 1;
+  const first = analysePeriod(actuals[0]);
+  const nn = actuals.length;
+  let g =
+    nn > 1 && first.revenue > 0
+      ? Math.pow(a.revenue / first.revenue, 1 / (nn - 1)) - 1
+      : 0.05;
+  g = Math.max(-0.1, Math.min(0.25, g));
+
+  const gm = a.grossMargin / 100;
+  const ratio = (x: number) => x / rev0;
+  const salP = ratio(L.pl.salaries);
+  const trP = ratio(L.pl.transport);
+  const mkP = ratio(L.pl.marketing);
+  const oxP = ratio(L.pl.opex);
+  const daP = ratio(L.pl.da);
+  const intP = ratio(L.pl.interest);
+  const taxRate = a.pbt > 0 ? Math.max(0, Math.min(0.35, L.pl.tax / a.pbt)) : 0.18;
+  const dso = a.dso,
+    dio = a.dio,
+    dpo = a.dpo;
+  const ppeP = ratio(L.bs.ppe),
+    intangP = ratio(L.bs.intangibles),
+    oCAp = ratio(L.bs.otherCA),
+    oNCAp = ratio(L.bs.otherNCA),
+    oCLp = ratio(L.bs.otherCL),
+    oLTLp = ratio(L.bs.otherLTL);
+  const shortDebt = L.bs.shortDebt,
+    longDebt = L.bs.longDebt;
+  const payout = 0.3;
+
+  const startYear = yearOf(L.label);
+  const out: StatementPeriod[] = [];
+  let prevEquity = L.bs.equity;
+  for (let i = 1; i <= years; i++) {
+    const rev = rev0 * Math.pow(1 + g, i);
+    const cogs = rev * (1 - gm);
+    const salaries = rev * salP,
+      transport = rev * trP,
+      marketing = rev * mkP,
+      opex = rev * oxP;
+    const da = rev * daP,
+      interest = rev * intP;
+    const ebitda = rev - cogs - salaries - transport - marketing - opex;
+    const ebit = ebitda - da;
+    const pbt = ebit - interest;
+    const tax = pbt > 0 ? pbt * taxRate : 0;
+    const ni = pbt - tax;
+    const pl: PLData = {
+      revenue: rnd(rev),
+      cogs: rnd(cogs),
+      salaries: rnd(salaries),
+      transport: rnd(transport),
+      marketing: rnd(marketing),
+      opex: rnd(opex),
+      otherIncome: 0,
+      da: rnd(da),
+      interest: rnd(interest),
+      tax: rnd(tax),
+    };
+    const receivables = (rev * dso) / 365;
+    const inventory = (cogs * dio) / 365;
+    const payables = (cogs * dpo) / 365;
+    const ppe = rev * ppeP,
+      intangibles = rev * intangP,
+      otherCA = rev * oCAp,
+      otherNCA = rev * oNCAp,
+      otherCL = rev * oCLp,
+      otherLTL = rev * oLTLp;
+    const equity = prevEquity + ni * (1 - payout);
+    prevEquity = equity;
+    const nonCashAssets =
+      receivables + inventory + otherCA + ppe + intangibles + otherNCA;
+    const liab = payables + shortDebt + otherCL + longDebt + otherLTL;
+    const cash = liab + equity - nonCashAssets; // balancing plug
+    const bs: BSData = {
+      cash: rnd(cash),
+      receivables: rnd(receivables),
+      inventory: rnd(inventory),
+      otherCA: rnd(otherCA),
+      ppe: rnd(ppe),
+      intangibles: rnd(intangibles),
+      otherNCA: rnd(otherNCA),
+      payables: rnd(payables),
+      shortDebt: rnd(shortDebt),
+      otherCL: rnd(otherCL),
+      longDebt: rnd(longDebt),
+      otherLTL: rnd(otherLTL),
+      equity: rnd(equity),
+    };
+    out.push({
+      id: `${L.id}_proj${i}`,
+      label: `FY${startYear + i}E`,
+      pl,
+      bs,
+      seasonality: L.seasonality,
+      segments: L.segments.map((s) => ({
+        name: s.name,
+        value: rnd((s.value / rev0) * rev),
+      })),
+      projected: true,
+    });
+  }
+  return out;
+}
+
+/** Appends a 3-year projection to a case if it has actuals but no projections. */
+export function withProjection(c: StatementCase, years = 3): StatementCase {
+  if (c.periods.some((p) => p.projected)) return c;
+  const proj = projectPeriods(c.periods, years);
+  if (!proj.length) return c;
+  return { ...c, periods: [...c.periods, ...proj] };
+}
+
+/* ----------------------- Cash flow (indirect) -------------------------- */
+export interface CashFlowRow {
+  label: string;
+  projected: boolean;
+  netIncome: number;
+  da: number;
+  deltaWC: number;
+  operating: number;
+  capex: number;
+  otherInvesting: number;
+  investing: number;
+  debtFlow: number;
+  equityFlow: number;
+  financing: number;
+  netChange: number;
+  closingCash: number;
+}
+
+/**
+ * Indirect-method cash flow derived from period-over-period P&L + balance-sheet
+ * movements. By construction the net change in cash reconciles exactly to the
+ * change in the cash line — this is the linkage that ties the 3 statements.
+ */
+export function caseCashFlows(periods: StatementPeriod[]): CashFlowRow[] {
+  const sorted = [...periods].sort((a, b) => yearOf(a.label) - yearOf(b.label));
+  const rows: CashFlowRow[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const p = sorted[i];
+    const prev = sorted[i - 1];
+    const a = analysePeriod(p);
+    const ni = a.netIncome;
+    const da = p.pl.da;
+    const dRec = p.bs.receivables - prev.bs.receivables;
+    const dInv = p.bs.inventory - prev.bs.inventory;
+    const dPay = p.bs.payables - prev.bs.payables;
+    const dOCA = p.bs.otherCA - prev.bs.otherCA;
+    const dOCL = p.bs.otherCL - prev.bs.otherCL;
+    const deltaWC = -dRec - dInv - dOCA + dPay + dOCL;
+    const operating = ni + da + deltaWC;
+    const capex = -((p.bs.ppe - prev.bs.ppe) + da);
+    const otherInvesting = -(
+      p.bs.intangibles -
+      prev.bs.intangibles +
+      (p.bs.otherNCA - prev.bs.otherNCA)
+    );
+    const investing = capex + otherInvesting;
+    const debtFlow =
+      p.bs.shortDebt +
+      p.bs.longDebt -
+      (prev.bs.shortDebt + prev.bs.longDebt) +
+      (p.bs.otherLTL - prev.bs.otherLTL);
+    const equityFlow = p.bs.equity - prev.bs.equity - ni;
+    const financing = debtFlow + equityFlow;
+    const netChange = operating + investing + financing;
+    rows.push({
+      label: p.label,
+      projected: !!p.projected,
+      netIncome: ni,
+      da,
+      deltaWC,
+      operating,
+      capex,
+      otherInvesting,
+      investing,
+      debtFlow,
+      equityFlow,
+      financing,
+      netChange,
+      closingCash: p.bs.cash,
+    });
+  }
+  return rows;
+}
+
+function rnd(x: number): number {
+  return Math.round(x);
 }
 
 /* ----------------------------- Projection ------------------------------ */
@@ -256,6 +478,204 @@ export function projectForward(
     });
   }
   return out;
+}
+
+/* ------------------- Full 3-statement projection ----------------------- */
+/**
+ * Projects full P&L + balance sheet forward for `years`, holding the latest
+ * historical ratios constant, rolling equity forward with retained earnings and
+ * using cash (with a revolver fallback) as the balancing plug. Returns fully
+ * balanced StatementPeriods labelled "FY####E".
+ */
+export function projectStatements(
+  periods: StatementPeriod[],
+  growthOverride: number | null,
+  years = 3
+): StatementPeriod[] {
+  if (periods.length === 0) return [];
+  const last = periods[periods.length - 1];
+  const n = periods.length;
+  let g =
+    growthOverride !== null
+      ? growthOverride / 100
+      : n > 1 && periods[0].pl.revenue > 0
+      ? Math.pow(last.pl.revenue / periods[0].pl.revenue, 1 / (n - 1)) - 1
+      : 0.05;
+  g = Math.max(-0.2, Math.min(0.4, g));
+
+  const la = analysePeriod(last);
+  const rev0 = last.pl.revenue || 1;
+  const grossM = (last.pl.revenue - last.pl.cogs) / rev0;
+  const salR = last.pl.salaries / rev0;
+  const trR = last.pl.transport / rev0;
+  const mkR = last.pl.marketing / rev0;
+  const oxR = last.pl.opex / rev0;
+  const daR = last.pl.da / rev0;
+  const intR = last.pl.interest / rev0;
+  const taxR = last.pl.tax / rev0;
+  const dso = la.dso;
+  const dio = la.dio;
+  const dpo = la.dpo;
+  const otherCAR = last.bs.otherCA / rev0;
+  const ppeR = last.bs.ppe / rev0;
+  const otherNCAR = last.bs.otherNCA / rev0;
+  const otherCLR = last.bs.otherCL / rev0;
+  const otherLTLR = last.bs.otherLTL / rev0;
+  const startYear = parseInt((last.label.match(/\d{4}/) || ["2024"])[0], 10);
+  const segShare = last.segments.map((s) => ({
+    name: s.name,
+    share: s.value / rev0,
+  }));
+
+  const out: StatementPeriod[] = [];
+  let prev = last;
+  for (let i = 1; i <= years; i++) {
+    const revenue = prev.pl.revenue * (1 + g);
+    const cogs = revenue * (1 - grossM);
+    const salaries = revenue * salR;
+    const transport = revenue * trR;
+    const marketing = revenue * mkR;
+    const opex = revenue * oxR;
+    const da = revenue * daR;
+    const interest = revenue * intR;
+    const ebitda = revenue - cogs - salaries - transport - marketing - opex;
+    const pbt = ebitda - da - interest;
+    const tax = revenue * taxR;
+    const netIncome = pbt - tax;
+
+    const receivables = (revenue * dso) / 365;
+    const inventory = (cogs * dio) / 365;
+    const payables = (cogs * dpo) / 365;
+    const otherCA = revenue * otherCAR;
+    const ppe = revenue * ppeR;
+    const intangibles = prev.bs.intangibles; // hold acquired intangibles flat
+    const otherNCA = revenue * otherNCAR;
+    let shortDebt = prev.bs.shortDebt;
+    const longDebt = prev.bs.longDebt;
+    const otherCL = revenue * otherCLR;
+    const otherLTL = revenue * otherLTLR;
+    const equity = prev.bs.equity + netIncome * 0.6; // retain 60%, 40% payout
+    const nonCashAssets =
+      receivables + inventory + otherCA + ppe + intangibles + otherNCA;
+    let cash =
+      equity + payables + shortDebt + otherCL + longDebt + otherLTL - nonCashAssets;
+    if (cash < 0) {
+      shortDebt += -cash; // revolver draw to fund the gap
+      cash = 0;
+    }
+
+    const r = Math.round;
+    const period: StatementPeriod = {
+      id: `proj_${startYear + i}`,
+      label: `FY${startYear + i}E`,
+      pl: {
+        revenue: r(revenue),
+        cogs: r(cogs),
+        salaries: r(salaries),
+        transport: r(transport),
+        marketing: r(marketing),
+        opex: r(opex),
+        otherIncome: 0,
+        da: r(da),
+        interest: r(interest),
+        tax: r(tax),
+      },
+      bs: {
+        cash: r(cash),
+        receivables: r(receivables),
+        inventory: r(inventory),
+        otherCA: r(otherCA),
+        ppe: r(ppe),
+        intangibles: r(intangibles),
+        otherNCA: r(otherNCA),
+        payables: r(payables),
+        shortDebt: r(shortDebt),
+        otherCL: r(otherCL),
+        longDebt: r(longDebt),
+        otherLTL: r(otherLTL),
+        equity: r(equity),
+      },
+      seasonality: last.seasonality,
+      segments: segShare.map((s) => ({ name: s.name, value: r(revenue * s.share) })),
+    };
+    out.push(period);
+    prev = period;
+  }
+  return out;
+}
+
+/** Historical + 3 projected periods, plus the index where projections start. */
+export function fullSeries(
+  c: StatementCase,
+  growthOverride: number | null = null
+): { periods: StatementPeriod[]; projFrom: number } {
+  const proj = projectStatements(c.periods, growthOverride, 3);
+  return {
+    periods: [...c.periods, ...proj],
+    projFrom: c.periods.length,
+  };
+}
+
+/* --------------------------- Cash flow --------------------------------- */
+export interface CashFlow {
+  label: string;
+  netIncome: number;
+  da: number;
+  changeWC: number; // cash impact of working-capital change (+ = source)
+  cfo: number;
+  capex: number;
+  changeIntangibles: number;
+  cfi: number;
+  changeDebt: number;
+  equityFlows: number; // dividends/buybacks/issuance (net)
+  cff: number;
+  netChange: number;
+  endCash: number;
+  fcf: number; // CFO - capex
+}
+
+/** Indirect-method cash flow from two consecutive balance sheets + the P&L. */
+export function computeCashFlow(
+  prev: StatementPeriod,
+  curr: StatementPeriod
+): CashFlow {
+  const ni = analysePeriod(curr).netIncome;
+  const da = curr.pl.da;
+  const dRec = curr.bs.receivables - prev.bs.receivables;
+  const dInv = curr.bs.inventory - prev.bs.inventory;
+  const dPay = curr.bs.payables - prev.bs.payables;
+  const dOtherCA = curr.bs.otherCA - prev.bs.otherCA;
+  const dOtherCL = curr.bs.otherCL - prev.bs.otherCL;
+  const changeWC = -dRec - dInv + dPay - dOtherCA + dOtherCL;
+  const cfo = ni + da + changeWC;
+
+  const capex = curr.bs.ppe - prev.bs.ppe + da; // PP&E roll-forward
+  const dIntang = curr.bs.intangibles - prev.bs.intangibles;
+  const dOtherNCA = curr.bs.otherNCA - prev.bs.otherNCA;
+  const cfi = -capex - dIntang - dOtherNCA;
+
+  const dShort = curr.bs.shortDebt - prev.bs.shortDebt;
+  const dLong = curr.bs.longDebt - prev.bs.longDebt;
+  const dOtherLTL = curr.bs.otherLTL - prev.bs.otherLTL;
+  const equityFlows = curr.bs.equity - prev.bs.equity - ni; // dividends/buybacks/issuance
+  const cff = dShort + dLong + dOtherLTL + equityFlows;
+
+  return {
+    label: curr.label,
+    netIncome: ni,
+    da,
+    changeWC,
+    cfo,
+    capex,
+    changeIntangibles: dIntang,
+    cfi,
+    changeDebt: dShort + dLong,
+    equityFlows,
+    cff,
+    netChange: cfo + cfi + cff,
+    endCash: curr.bs.cash,
+    fcf: cfo - capex,
+  };
 }
 
 /* ------------------------------ Quiz ----------------------------------- */

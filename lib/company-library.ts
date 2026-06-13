@@ -1,5 +1,6 @@
 import type { StatementCase, StatementPeriod, PLData, BSData } from "./types";
 import { todayISO } from "./utils";
+import { projectPeriods } from "./statements";
 
 /**
  * Company library — 10 anonymised businesses across diverse sectors, each with
@@ -189,7 +190,7 @@ function generate(spec: CompanySpec): StatementCase {
     name: spec.hiddenName,
     createdAt: todayISO(),
     currency: "EUR",
-    periods,
+    periods: [...periods, ...projectPeriods(periods)],
     answers: {},
     guessSector: "",
     actualSector: spec.sector,
@@ -217,7 +218,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Designs and sells premium consumer hardware and wearables with a fast-growing, high-margin services ecosystem. Mega-cap, cash generative, returns capital via buybacks.",
     unit: "Illustrative — modeled on a mega-cap hardware + services company.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 274_000_000_000,
     growths: [0.33, 0.08, -0.03, 0.02],
     grossMargin: 0.41,
@@ -256,7 +257,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Global non-alcoholic beverage company with iconic brands sold through a bottling and distribution network. High gross margin, heavy marketing, brand intangibles.",
     unit: "Illustrative — modeled on a global beverages major.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 33_000_000_000,
     growths: [0.17, 0.11, 0.07, 0.03],
     grossMargin: 0.6,
@@ -294,7 +295,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Large food retailer running a network of supermarkets. Razor-thin net margin, fast inventory, negative working capital (suppliers fund the business), Q4 peak.",
     unit: "Illustrative — modeled on a major grocery retailer.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 58_000_000_000,
     growths: [0.06, 0.03, 0.04, 0.05],
     grossMargin: 0.25,
@@ -332,7 +333,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Enterprise software & cloud platform sold on subscription. Very high gross margin, large deferred revenue, asset-light, sticky recurring revenue.",
     unit: "Illustrative — modeled on a large enterprise software company.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 110_000_000_000,
     growths: [0.18, 0.18, 0.07, 0.16],
     grossMargin: 0.69,
@@ -371,7 +372,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Integrated steel & mining producer. Highly cyclical, low gross margin, very capital-intensive (blast furnaces), volatile earnings, meaningful leverage.",
     unit: "Illustrative — modeled on a global steel producer.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 53_000_000_000,
     growths: [0.44, 0.18, -0.09, -0.08],
     grossMargin: 0.16,
@@ -410,7 +411,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Research-driven pharmaceutical company. High gross margin, very large R&D, patent-protected products with cliff risk, heavy intangibles/goodwill from M&A.",
     unit: "Illustrative — modeled on a large-cap pharma company.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 42_000_000_000,
     growths: [0.23, 0.3, -0.42, 0.05],
     grossMargin: 0.71,
@@ -448,7 +449,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Network airline carrying passengers and cargo. Low margin, fuel-heavy cost base, enormous fleet (PP&E), high leverage and lease liabilities, strong summer peak.",
     unit: "Illustrative — modeled on a large European airline group.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 13_000_000_000,
     growths: [0.25, 1.1, 0.55, 0.12],
     grossMargin: 0.22,
@@ -487,7 +488,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Automotive manufacturer with a captive financing arm. Huge revenue, mid-teens gross margin, capital-intensive plants, large inventory and a financing balance sheet.",
     unit: "Illustrative — modeled on a global auto OEM.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 220_000_000_000,
     growths: [0.12, 0.12, 0.15, 0.02],
     grossMargin: 0.18,
@@ -525,7 +526,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Vertically-integrated fast-fashion apparel retailer. High gross margin, very fast inventory, store + e-commerce network, autumn/winter seasonal peak, net cash.",
     unit: "Illustrative — modeled on a global fast-fashion retailer.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 20_000_000_000,
     growths: [0.36, 0.18, 0.1, 0.07],
     grossMargin: 0.57,
@@ -563,7 +564,7 @@ const SPECS: CompanySpec[] = [
     business:
       "Asset-light online marketplace earning a commission on travel bookings. Very high margin, negative working capital (collects before paying suppliers), summer peak.",
     unit: "Illustrative — modeled on a large online travel platform.",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: 6_800_000_000,
     growths: [-0.55, 1.6, 0.55, 0.25],
     grossMargin: 0.85,
@@ -593,6 +594,114 @@ const SPECS: CompanySpec[] = [
       { name: "Advertising & other", pct: 0.09 },
       { name: "Experiences", pct: 0.05 },
     ],
+  },
+
+  /* ---------------- European large-caps (would hire EY) ---------------- */
+  {
+    id: "eu_luxury", hiddenName: "Mystery Co. EU-1", sector: "Consumer Discretionary — Luxury Goods (Europe)",
+    business: "European luxury conglomerate spanning fashion & leather goods, selective retail, perfumes & cosmetics, watches & jewellery and wines & spirits. Very high margin, iconic brands, global directly-operated retail.",
+    unit: "", startYear: 2021, revenue0: 64_000_000_000, growths: [0.23, 0.09, 0.1, 0.05], grossMargin: 0.68,
+    salariesPct: 0.1, transportPct: 0.02, marketingPct: 0.12, otherOpexPct: 0.08, daPct: 0.05, interestPct: 0.01, taxRate: 0.25,
+    cashPct: 0.1, dso: 20, dio: 130, dpo: 50, ppePct: 0.3, intangiblesPct: 0.55, otherCAPct: 0.05, otherNCAPct: 0.2, otherCLPct: 0.1, shortDebtPct: 0.05, longDebtPct: 0.3, otherLTLPct: 0.15,
+    seasonality: HOLIDAY_Q4, segments: [{ name: "Fashion & leather goods", pct: 0.48 }, { name: "Selective retail", pct: 0.18 }, { name: "Watches & jewellery", pct: 0.14 }, { name: "Perfumes & cosmetics", pct: 0.12 }, { name: "Wines & spirits", pct: 0.08 }],
+  },
+  {
+    id: "eu_food", hiddenName: "Mystery Co. EU-2", sector: "Consumer Staples — Packaged Food & Beverage (Europe)",
+    business: "World-leading food & beverage group — coffee, petcare, nutrition & health, prepared dishes, dairy and confectionery. Defensive, steady single-digit growth, heavy brands and goodwill.",
+    unit: "", startYear: 2021, revenue0: 87_000_000_000, growths: [0.03, 0.08, 0.02, 0.01], grossMargin: 0.47,
+    salariesPct: 0.1, transportPct: 0.04, marketingPct: 0.09, otherOpexPct: 0.06, daPct: 0.04, interestPct: 0.02, taxRate: 0.23,
+    cashPct: 0.05, dso: 35, dio: 55, dpo: 70, ppePct: 0.3, intangiblesPct: 0.55, otherCAPct: 0.05, otherNCAPct: 0.3, otherCLPct: 0.1, shortDebtPct: 0.1, longDebtPct: 0.45, otherLTLPct: 0.15,
+    seasonality: FLAT, segments: [{ name: "Beverages (powdered & liquid)", pct: 0.27 }, { name: "Petcare", pct: 0.2 }, { name: "Nutrition & health", pct: 0.17 }, { name: "Prepared dishes", pct: 0.13 }, { name: "Milk & ice cream", pct: 0.13 }, { name: "Confectionery", pct: 0.1 }],
+  },
+  {
+    id: "eu_industrial", hiddenName: "Mystery Co. EU-3", sector: "Industrials — Diversified Technology (Europe)",
+    business: "Diversified industrial-technology group: factory automation & digital industries, smart infrastructure, rail mobility and medical technology. Large order backlog and software content.",
+    unit: "", startYear: 2021, revenue0: 62_000_000_000, growths: [0.04, 0.1, 0.08, 0.05], grossMargin: 0.36,
+    salariesPct: 0.16, transportPct: 0.02, marketingPct: 0.03, otherOpexPct: 0.06, daPct: 0.04, interestPct: 0.02, taxRate: 0.22,
+    cashPct: 0.12, dso: 70, dio: 60, dpo: 55, ppePct: 0.18, intangiblesPct: 0.55, otherCAPct: 0.15, otherNCAPct: 0.2, otherCLPct: 0.15, shortDebtPct: 0.08, longDebtPct: 0.4, otherLTLPct: 0.18,
+    seasonality: AUTO, segments: [{ name: "Digital industries", pct: 0.32 }, { name: "Smart infrastructure", pct: 0.28 }, { name: "Healthcare technology", pct: 0.18 }, { name: "Mobility / rail", pct: 0.16 }, { name: "Other", pct: 0.06 }],
+  },
+  {
+    id: "eu_software", hiddenName: "Mystery Co. EU-4", sector: "Technology — Enterprise Software (Europe)",
+    business: "European enterprise resource-planning software leader transitioning a large licence base to cloud subscriptions. Very high margin, sticky, big deferred revenue.",
+    unit: "", startYear: 2021, revenue0: 28_000_000_000, growths: [0.02, 0.11, 0.06, 0.1], grossMargin: 0.72, marginDriftPpt: 0.004,
+    salariesPct: 0.3, transportPct: 0.002, marketingPct: 0.07, otherOpexPct: 0.05, daPct: 0.05, interestPct: 0.01, taxRate: 0.26,
+    cashPct: 0.12, dso: 70, dio: 1, dpo: 35, ppePct: 0.15, intangiblesPct: 0.7, otherCAPct: 0.08, otherNCAPct: 0.15, otherCLPct: 0.2, shortDebtPct: 0.05, longDebtPct: 0.2, otherLTLPct: 0.12,
+    seasonality: FLAT, segments: [{ name: "Cloud", pct: 0.45 }, { name: "Software licences & support", pct: 0.42 }, { name: "Services", pct: 0.13 }],
+  },
+  {
+    id: "eu_semieq", hiddenName: "Mystery Co. EU-5", sector: "Technology — Semiconductor Equipment (Europe)",
+    business: "Near-monopoly supplier of advanced photolithography systems essential to making the most cutting-edge chips. Enormous backlog, high margin, customer advances.",
+    unit: "", startYear: 2021, revenue0: 18_000_000_000, growths: [0.35, 0.14, 0.3, 0.03], grossMargin: 0.51, marginDriftPpt: 0.005,
+    salariesPct: 0.1, transportPct: 0.01, marketingPct: 0.005, otherOpexPct: 0.06, daPct: 0.03, interestPct: 0.005, taxRate: 0.16,
+    cashPct: 0.2, dso: 50, dio: 120, dpo: 30, ppePct: 0.2, intangiblesPct: 0.2, otherCAPct: 0.2, otherNCAPct: 0.1, otherCLPct: 0.3, shortDebtPct: 0.02, longDebtPct: 0.2, otherLTLPct: 0.1,
+    seasonality: FLAT, segments: [{ name: "EUV systems", pct: 0.45 }, { name: "DUV systems", pct: 0.3 }, { name: "Installed-base management", pct: 0.25 }],
+  },
+  {
+    id: "eu_brewer", hiddenName: "Mystery Co. EU-6", sector: "Consumer Staples — Brewing (Europe)",
+    business: "World's largest brewer with global and local beer brands. High margin but heavily levered from past mega-mergers (huge goodwill), strong emerging-market exposure, summer peak.",
+    unit: "", startYear: 2021, revenue0: 54_000_000_000, growths: [0.08, 0.06, 0.03, 0.02], grossMargin: 0.55,
+    salariesPct: 0.08, transportPct: 0.06, marketingPct: 0.12, otherOpexPct: 0.06, daPct: 0.06, interestPct: 0.06, taxRate: 0.2,
+    cashPct: 0.05, dso: 20, dio: 45, dpo: 90, ppePct: 0.4, intangiblesPct: 1.6, otherCAPct: 0.05, otherNCAPct: 0.1, otherCLPct: 0.12, shortDebtPct: 0.05, longDebtPct: 1.4, otherLTLPct: 0.25,
+    seasonality: SUMMER, segments: [{ name: "North America", pct: 0.32 }, { name: "Middle Americas", pct: 0.25 }, { name: "South America", pct: 0.18 }, { name: "EMEA", pct: 0.15 }, { name: "Asia Pacific", pct: 0.1 }],
+  },
+  {
+    id: "eu_aero", hiddenName: "Mystery Co. EU-7", sector: "Industrials — Aerospace (Europe)",
+    business: "European aircraft manufacturer — commercial jets, helicopters, defence and space. Very low reported margin, enormous backlog, large customer advances funding working capital.",
+    unit: "", startYear: 2021, revenue0: 52_000_000_000, growths: [0.04, 0.13, 0.11, 0.06], grossMargin: 0.15,
+    salariesPct: 0.12, transportPct: 0.02, marketingPct: 0.01, otherOpexPct: 0.04, daPct: 0.04, interestPct: 0.01, taxRate: 0.22,
+    cashPct: 0.18, dso: 20, dio: 60, dpo: 50, ppePct: 0.18, intangiblesPct: 0.3, otherCAPct: 0.2, otherNCAPct: 0.2, otherCLPct: 0.55, shortDebtPct: 0.03, longDebtPct: 0.15, otherLTLPct: 0.25,
+    seasonality: HOLIDAY_Q4, segments: [{ name: "Commercial aircraft", pct: 0.74 }, { name: "Defence & space", pct: 0.14 }, { name: "Helicopters", pct: 0.12 }],
+  },
+  {
+    id: "eu_shipping", hiddenName: "Mystery Co. EU-8", sector: "Industrials — Container Shipping & Logistics (Europe)",
+    business: "Global container shipping and integrated logistics group. Hugely cyclical with freight rates — a 2021-22 super-boom then sharp normalisation. Asset-heavy fleet and terminals.",
+    unit: "", startYear: 2021, revenue0: 62_000_000_000, growths: [0.32, -0.37, -0.1, 0.05], grossMargin: 0.32, marginDriftPpt: -0.025,
+    salariesPct: 0.1, transportPct: 0.1, marketingPct: 0.01, otherOpexPct: 0.05, daPct: 0.07, interestPct: 0.02, taxRate: 0.05,
+    cashPct: 0.2, dso: 35, dio: 3, dpo: 35, ppePct: 0.55, intangiblesPct: 0.1, otherCAPct: 0.05, otherNCAPct: 0.1, otherCLPct: 0.12, shortDebtPct: 0.05, longDebtPct: 0.25, otherLTLPct: 0.12,
+    seasonality: FLAT, segments: [{ name: "Ocean (container shipping)", pct: 0.65 }, { name: "Logistics & services", pct: 0.27 }, { name: "Terminals", pct: 0.08 }],
+  },
+
+  /* ---------------- Serbian (APR) large companies --------------------- */
+  {
+    id: "rs_oil", hiddenName: "Mystery Co. RS-1", sector: "Energy — Oil & Gas (Serbia)",
+    business: "Vertically-integrated Serbian oil & gas company — exploration & production, refining, and a regional retail fuel-station network across the Balkans. The dominant domestic energy group.",
+    unit: "", startYear: 2021, revenue0: 3_000_000_000, growths: [0.55, 0.1, -0.05, 0.03], grossMargin: 0.3,
+    salariesPct: 0.06, transportPct: 0.04, marketingPct: 0.01, otherOpexPct: 0.06, daPct: 0.08, interestPct: 0.02, taxRate: 0.15,
+    cashPct: 0.06, dso: 25, dio: 30, dpo: 35, ppePct: 0.7, intangiblesPct: 0.05, otherCAPct: 0.05, otherNCAPct: 0.08, otherCLPct: 0.1, shortDebtPct: 0.05, longDebtPct: 0.2, otherLTLPct: 0.1,
+    seasonality: FLAT, segments: [{ name: "Refining & wholesale", pct: 0.55 }, { name: "Retail fuel network", pct: 0.3 }, { name: "Exploration & production", pct: 0.15 }],
+  },
+  {
+    id: "rs_telecom", hiddenName: "Mystery Co. RS-2", sector: "Communications — Telecom (Serbia)",
+    business: "Serbian incumbent telecom operator — mobile, fixed-line, broadband and pay-TV across Serbia and neighbouring markets. Heavy network assets and leverage from regional expansion.",
+    unit: "", startYear: 2021, revenue0: 1_300_000_000, growths: [0.1, 0.12, 0.08, 0.06], grossMargin: 0.58,
+    salariesPct: 0.12, transportPct: 0.02, marketingPct: 0.06, otherOpexPct: 0.1, daPct: 0.2, interestPct: 0.05, taxRate: 0.15,
+    cashPct: 0.05, dso: 45, dio: 5, dpo: 60, ppePct: 0.9, intangiblesPct: 0.4, otherCAPct: 0.05, otherNCAPct: 0.1, otherCLPct: 0.15, shortDebtPct: 0.1, longDebtPct: 0.8, otherLTLPct: 0.2,
+    seasonality: FLAT, segments: [{ name: "Mobile", pct: 0.5 }, { name: "Fixed & broadband", pct: 0.28 }, { name: "TV & media", pct: 0.14 }, { name: "Wholesale", pct: 0.08 }],
+  },
+  {
+    id: "rs_pharma", hiddenName: "Mystery Co. RS-3", sector: "Healthcare — Pharmaceuticals (Serbia)",
+    business: "Serbian generic-pharmaceutical manufacturer exporting across CEE and beyond, part of a larger international group. Strong R&D and regulatory base, export-driven growth.",
+    unit: "", startYear: 2021, revenue0: 450_000_000, growths: [0.08, 0.1, 0.07, 0.05], grossMargin: 0.55,
+    salariesPct: 0.16, transportPct: 0.02, marketingPct: 0.1, otherOpexPct: 0.06, daPct: 0.05, interestPct: 0.02, taxRate: 0.15,
+    cashPct: 0.08, dso: 70, dio: 100, dpo: 60, ppePct: 0.35, intangiblesPct: 0.2, otherCAPct: 0.05, otherNCAPct: 0.1, otherCLPct: 0.1, shortDebtPct: 0.05, longDebtPct: 0.2, otherLTLPct: 0.1,
+    seasonality: FLAT, segments: [{ name: "Domestic", pct: 0.4 }, { name: "Export — CEE", pct: 0.35 }, { name: "Export — other", pct: 0.25 }],
+  },
+  {
+    id: "rs_agri", hiddenName: "Mystery Co. RS-4", sector: "Consumer Staples — Agribusiness (Serbia)",
+    business: "Diversified Serbian agribusiness & food group — farming, sugar, food processing and commodity trading across the region. Land-heavy, harvest-seasonal, commodity-exposed.",
+    unit: "", startYear: 2021, revenue0: 1_200_000_000, growths: [0.12, 0.18, 0.06, 0.04], grossMargin: 0.16,
+    salariesPct: 0.05, transportPct: 0.04, marketingPct: 0.02, otherOpexPct: 0.04, daPct: 0.04, interestPct: 0.03, taxRate: 0.15,
+    cashPct: 0.05, dso: 40, dio: 60, dpo: 35, ppePct: 0.4, intangiblesPct: 0.1, otherCAPct: 0.1, otherNCAPct: 0.1, otherCLPct: 0.08, shortDebtPct: 0.12, longDebtPct: 0.3, otherLTLPct: 0.1,
+    seasonality: [7, 7, 8, 8, 8, 9, 9, 10, 11, 9, 7, 7], segments: [{ name: "Agriculture & farming", pct: 0.4 }, { name: "Food processing", pct: 0.32 }, { name: "Trading & distribution", pct: 0.28 }],
+  },
+  {
+    id: "rs_confectionery", hiddenName: "Mystery Co. RS-5", sector: "Consumer Staples — Confectionery (Serbia)",
+    business: "Serbian confectionery & biscuit maker with iconic regional brands, dominant domestic share and growing exports across former-Yugoslavia and CEE markets.",
+    unit: "", startYear: 2021, revenue0: 180_000_000, growths: [0.1, 0.12, 0.08, 0.06], grossMargin: 0.45,
+    salariesPct: 0.1, transportPct: 0.05, marketingPct: 0.1, otherOpexPct: 0.06, daPct: 0.04, interestPct: 0.02, taxRate: 0.15,
+    cashPct: 0.08, dso: 45, dio: 50, dpo: 55, ppePct: 0.3, intangiblesPct: 0.3, otherCAPct: 0.05, otherNCAPct: 0.1, otherCLPct: 0.1, shortDebtPct: 0.05, longDebtPct: 0.2, otherLTLPct: 0.1,
+    seasonality: HOLIDAY_Q4, segments: [{ name: "Biscuits", pct: 0.55 }, { name: "Chocolate", pct: 0.25 }, { name: "Other snacks", pct: 0.2 }],
   },
 ];
 
@@ -698,7 +807,7 @@ function fromArchetype(a: Arch, k: number): CompanySpec {
     sector: a.sector,
     business: a.business,
     unit: "",
-    startYear: 2020,
+    startYear: 2021,
     revenue0: Math.round(revenue0),
     growths,
     grossMargin: gm,

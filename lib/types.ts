@@ -163,11 +163,12 @@ export interface BSData {
 
 export interface StatementPeriod {
   id: string;
-  label: string; // e.g. "FY2023"
+  label: string; // e.g. "FY2023" or "FY2026E"
   pl: PLData;
   bs: BSData;
   seasonality: number[]; // 12 monthly revenue weights
   segments: { name: string; value: number }[]; // revenue breakdown
+  projected?: boolean; // true = analyst projection (not actuals)
 }
 
 export interface StatementCase {

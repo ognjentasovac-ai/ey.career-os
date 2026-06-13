@@ -33,13 +33,16 @@ import {
   analyseCase,
   analysePeriod,
   buildQuiz,
-  projectForward,
   emptyPL,
   emptyBS,
   MONTHS,
   sumSegments,
   computeStreak,
   statementProficiency,
+  projectPeriods,
+  withProjection,
+  caseCashFlows,
+  yearOf,
 } from "@/lib/statements";
 import {
   Card,
@@ -168,19 +171,21 @@ export function Statements() {
         ticker: string;
         currency: string;
       };
+      const actualPeriods: StatementPeriod[] = (json.periods as any[]).map((p) => ({
+        id: `${id}_${p.label}`,
+        label: p.label,
+        pl: p.pl,
+        bs: p.bs,
+        seasonality: p.seasonality,
+        segments: p.segments,
+        projected: false,
+      }));
       const newCase: StatementCase = {
         id,
         name: `${co.name}${co.ticker ? ` (${co.ticker})` : ""}`,
         createdAt: todayISO(),
         currency: co.currency,
-        periods: (json.periods as any[]).map((p) => ({
-          id: `${id}_${p.label}`,
-          label: p.label,
-          pl: p.pl,
-          bs: p.bs,
-          seasonality: p.seasonality,
-          segments: p.segments,
-        })),
+        periods: [...actualPeriods, ...projectPeriods(actualPeriods)],
         answers: {},
         guessSector: "",
         actualSector: co.sector,
@@ -519,7 +524,7 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* --------------------------- Case detail ------------------------------- */
-type View = "inputs" | "analysis" | "projection" | "quiz";
+type View = "reports" | "edit" | "seasonality" | "analysis" | "quiz";
 
 function CaseDetail({
   c,
@@ -532,13 +537,21 @@ function CaseDetail({
   onChange: (c: StatementCase) => void;
   onDelete: () => void;
 }) {
-  const [view, setView] = useState<View>("inputs");
-  const analysis = useMemo(() => analyseCase(c), [c]);
+  const [view, setView] = useState<View>("reports");
+
+  const actualCount = c.periods.filter((p) => !p.projected).length;
+  const projCount = c.periods.filter((p) => p.projected).length;
 
   function addPeriod() {
-    const lastLabel = c.periods.at(-1)?.label || "FY2023";
-    const year = parseInt((lastLabel.match(/\d{4}/) || ["2023"])[0], 10) + 1;
-    onChange({ ...c, periods: [...c.periods, newPeriod(`FY${year}`)] });
+    const actuals = c.periods.filter((p) => !p.projected);
+    const lastLabel = actuals.at(-1)?.label || "FY2024";
+    const year = parseInt((lastLabel.match(/\d{4}/) || ["2024"])[0], 10) + 1;
+    const next = newPeriod(`FY${year}`);
+    const proj = c.periods.filter((p) => p.projected);
+    onChange({
+      ...c,
+      periods: [...actuals, next, ...proj],
+    });
   }
   function updatePeriod(id: string, patch: Partial<StatementPeriod>) {
     onChange({
@@ -549,11 +562,18 @@ function CaseDetail({
   function removePeriod(id: string) {
     onChange({ ...c, periods: c.periods.filter((p) => p.id !== id) });
   }
+  function buildProjection() {
+    onChange(withProjection({ ...c, periods: c.periods.filter((p) => !p.projected) }));
+  }
+  function clearProjection() {
+    onChange({ ...c, periods: c.periods.filter((p) => !p.projected) });
+  }
 
   const tabs: { key: View; label: string; icon: React.ReactNode }[] = [
-    { key: "inputs", label: "Statements", icon: <Calculator size={14} /> },
+    { key: "reports", label: "Reports", icon: <Layers3 size={14} /> },
+    { key: "seasonality", label: "Seasonality", icon: <CalendarPlus size={14} /> },
     { key: "analysis", label: "Analysis", icon: <LineIcon size={14} /> },
-    { key: "projection", label: "Projection", icon: <CalendarPlus size={14} /> },
+    { key: "edit", label: "Edit data", icon: <Calculator size={14} /> },
     { key: "quiz", label: "EY Quiz", icon: <HelpCircle size={14} /> },
   ];
 
@@ -567,14 +587,21 @@ function CaseDetail({
           <Input
             value={c.name}
             onChange={(e) => onChange({ ...c, name: e.target.value })}
-            className="h-9 w-44 font-display text-base font-semibold"
+            className="h-9 w-48 font-display text-base font-semibold"
           />
-          <Badge variant="accent">{c.periods.length} periods</Badge>
+          <Badge variant="accent">{actualCount} actual</Badge>
+          {projCount > 0 && <Badge variant="gold">+{projCount} projected</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={addPeriod}>
-            <Plus size={14} /> Add year
-          </Button>
+          {projCount === 0 ? (
+            <Button variant="gold" onClick={buildProjection}>
+              <CalendarPlus size={14} /> Add 3Y projection
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={clearProjection}>
+              <Trash2 size={14} /> Clear projection
+            </Button>
+          )}
           <Button variant="destructive" size="icon" onClick={onDelete}>
             <Trash2 size={15} />
           </Button>
@@ -598,16 +625,336 @@ function CaseDetail({
         ))}
       </div>
 
-      {view === "inputs" && (
+      {view === "reports" && <ReportsView c={c} />}
+      {view === "seasonality" && <SeasonalityView c={c} onChange={onChange} />}
+      {view === "analysis" && <AnalysisView c={c} />}
+      {view === "edit" && (
         <InputsView
           c={c}
           onUpdatePeriod={updatePeriod}
           onRemovePeriod={removePeriod}
+          onAddYear={addPeriod}
         />
       )}
-      {view === "analysis" && <AnalysisView c={c} />}
-      {view === "projection" && <ProjectionView c={c} onChange={onChange} />}
       {view === "quiz" && <QuizView c={c} onChange={onChange} />}
+    </div>
+  );
+}
+
+/* ---------------------- Reports: IS / BS / CF -------------------------- */
+interface MatrixCol {
+  label: string;
+  projected: boolean;
+}
+interface MatrixRow {
+  label: string;
+  vals: (number | null)[];
+  bold?: boolean;
+  indent?: boolean;
+  memo?: boolean;
+  pct?: (string | null)[];
+}
+
+function StatementMatrix({
+  title,
+  subtitle,
+  cols,
+  rows,
+}: {
+  title: string;
+  subtitle?: string;
+  cols: MatrixCol[];
+  rows: MatrixRow[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        )}
+      </CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+              <th className="sticky left-0 bg-panel px-4 py-2 text-left font-medium">
+                {title.split(" ")[0]}
+              </th>
+              {cols.map((col) => (
+                <th
+                  key={col.label}
+                  className={`px-3 py-2 text-right font-medium ${
+                    col.projected ? "text-gold" : ""
+                  }`}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr
+                key={ri}
+                className={`border-b border-border/40 ${
+                  row.bold ? "bg-elevated/40 font-semibold" : ""
+                } ${row.memo ? "text-muted-foreground" : ""}`}
+              >
+                <td
+                  className={`sticky left-0 bg-panel px-4 py-1.5 text-left ${
+                    row.indent ? "pl-7 text-muted-foreground" : ""
+                  } ${row.bold ? "bg-elevated/40 font-semibold" : ""}`}
+                >
+                  {row.label}
+                </td>
+                {row.vals.map((v, ci) => (
+                  <td
+                    key={ci}
+                    className={`px-3 py-1.5 text-right tabular ${
+                      cols[ci]?.projected ? "text-gold/90" : ""
+                    } ${row.bold ? "font-semibold" : ""}`}
+                  >
+                    {v === null ? (
+                      <span className="text-muted-foreground/40">—</span>
+                    ) : (
+                      <>
+                        {eur(v)}
+                        {row.pct && row.pct[ci] && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">
+                            {row.pct[ci]}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReportsView({ c }: { c: StatementCase }) {
+  const sorted = useMemo(
+    () => [...c.periods].sort((a, b) => yearOf(a.label) - yearOf(b.label)),
+    [c.periods]
+  );
+  if (!sorted.length || !sorted.some((p) => p.pl.revenue))
+    return <EmptyState message="Enter the statements first (Edit data tab)." />;
+
+  const an = sorted.map(analysePeriod);
+  const cols: MatrixCol[] = sorted.map((p) => ({
+    label: p.label,
+    projected: !!p.projected,
+  }));
+  const pctMargin = (num: number, den: number) =>
+    den ? `${((num / den) * 100).toFixed(0)}%` : "";
+
+  // Income statement
+  const isRows: MatrixRow[] = [
+    { label: "Revenue", vals: an.map((a) => a.revenue), bold: true },
+    { label: "Cost of goods sold", vals: sorted.map((p) => p.pl.cogs), indent: true },
+    {
+      label: "Gross profit",
+      vals: an.map((a) => a.grossProfit),
+      bold: true,
+      pct: an.map((a) => `${a.grossMargin.toFixed(0)}%`),
+    },
+    { label: "Salaries & wages", vals: sorted.map((p) => p.pl.salaries), indent: true },
+    { label: "Transport & logistics", vals: sorted.map((p) => p.pl.transport), indent: true },
+    { label: "Marketing & selling", vals: sorted.map((p) => p.pl.marketing), indent: true },
+    { label: "Other operating expenses", vals: sorted.map((p) => p.pl.opex), indent: true },
+    {
+      label: "EBITDA",
+      vals: an.map((a) => a.ebitda),
+      bold: true,
+      pct: an.map((a) => `${a.ebitdaMargin.toFixed(0)}%`),
+    },
+    { label: "Depreciation & amortisation", vals: sorted.map((p) => p.pl.da), indent: true },
+    { label: "EBIT", vals: an.map((a) => a.ebit), bold: true },
+    { label: "Interest", vals: sorted.map((p) => p.pl.interest), indent: true },
+    { label: "Tax", vals: sorted.map((p) => p.pl.tax), indent: true },
+    {
+      label: "Net income",
+      vals: an.map((a) => a.netIncome),
+      bold: true,
+      pct: an.map((a) => `${a.netMargin.toFixed(0)}%`),
+    },
+  ];
+
+  // Balance sheet
+  const bsRows: MatrixRow[] = [
+    { label: "Cash", vals: sorted.map((p) => p.bs.cash), indent: true },
+    { label: "Receivables", vals: sorted.map((p) => p.bs.receivables), indent: true },
+    { label: "Inventory", vals: sorted.map((p) => p.bs.inventory), indent: true },
+    { label: "Other current assets", vals: sorted.map((p) => p.bs.otherCA), indent: true },
+    { label: "Total current assets", vals: an.map((a) => a.totalCurrentAssets), bold: true },
+    { label: "PP&E", vals: sorted.map((p) => p.bs.ppe), indent: true },
+    { label: "Intangibles & goodwill", vals: sorted.map((p) => p.bs.intangibles), indent: true },
+    { label: "Other non-current assets", vals: sorted.map((p) => p.bs.otherNCA), indent: true },
+    { label: "Total assets", vals: an.map((a) => a.totalAssets), bold: true },
+    { label: "Payables", vals: sorted.map((p) => p.bs.payables), indent: true },
+    { label: "Short-term debt", vals: sorted.map((p) => p.bs.shortDebt), indent: true },
+    { label: "Other current liabilities", vals: sorted.map((p) => p.bs.otherCL), indent: true },
+    { label: "Long-term debt", vals: sorted.map((p) => p.bs.longDebt), indent: true },
+    { label: "Other non-current liabilities", vals: sorted.map((p) => p.bs.otherLTL), indent: true },
+    { label: "Total liabilities", vals: an.map((a) => a.totalLiabilities), bold: true },
+    { label: "Total equity", vals: an.map((a) => a.totalEquity), bold: true },
+    { label: "Net debt", vals: an.map((a) => a.netDebt), memo: true },
+  ];
+
+  // Cash flow (indirect) — first period has no prior, so it is blank
+  const cf = caseCashFlows(c.periods);
+  const cfByLabel = new Map(cf.map((r) => [r.label, r]));
+  const cfVal = (sel: (r: (typeof cf)[number]) => number) =>
+    sorted.map((p) => {
+      const r = cfByLabel.get(p.label);
+      return r ? sel(r) : null;
+    });
+  const cfRows: MatrixRow[] = [
+    { label: "Net income", vals: cfVal((r) => r.netIncome), indent: true },
+    { label: "+ Depreciation & amortisation", vals: cfVal((r) => r.da), indent: true },
+    { label: "± Change in working capital", vals: cfVal((r) => r.deltaWC), indent: true },
+    { label: "Operating cash flow", vals: cfVal((r) => r.operating), bold: true },
+    { label: "Capex", vals: cfVal((r) => r.capex), indent: true },
+    { label: "Other investing", vals: cfVal((r) => r.otherInvesting), indent: true },
+    { label: "Investing cash flow", vals: cfVal((r) => r.investing), bold: true },
+    { label: "Δ Debt", vals: cfVal((r) => r.debtFlow), indent: true },
+    { label: "Equity / dividends", vals: cfVal((r) => r.equityFlow), indent: true },
+    { label: "Financing cash flow", vals: cfVal((r) => r.financing), bold: true },
+    { label: "Net change in cash", vals: cfVal((r) => r.netChange), bold: true },
+    { label: "Closing cash", vals: cfVal((r) => r.closingCash), memo: true },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card className="panel-grad">
+        <CardContent className="flex items-start gap-3 p-4 text-xs text-muted-foreground">
+          <Layers3 size={16} className="mt-0.5 shrink-0 text-accent" />
+          <span>
+            Three integrated statements across 8 years — actual history plus a 3-year
+            analyst projection (the <span className="text-gold">gold</span> columns).
+            The cash flow is derived from the P&amp;L and balance-sheet movements
+            (indirect method), so it ties the statements together. Figures shown in the
+            company's reporting currency.
+          </span>
+        </CardContent>
+      </Card>
+
+      <StatementMatrix
+        title="Income Statement"
+        subtitle="Revenue down to net income, with margins on the key lines"
+        cols={cols}
+        rows={isRows}
+      />
+      <StatementMatrix
+        title="Balance Sheet"
+        subtitle="What the company owns and owes at each year-end — watch how it shifts"
+        cols={cols}
+        rows={bsRows}
+      />
+      <StatementMatrix
+        title="Cash Flow Statement"
+        subtitle="Indirect method — operating, investing and financing flows derived from the other two statements"
+        cols={cols}
+        rows={cfRows}
+      />
+    </div>
+  );
+}
+
+/* --------------------------- Seasonality ------------------------------- */
+function SeasonalityView({
+  c,
+  onChange,
+}: {
+  c: StatementCase;
+  onChange: (c: StatementCase) => void;
+}) {
+  const sorted = [...c.periods].sort((a, b) => yearOf(a.label) - yearOf(b.label));
+  const actuals = sorted.filter((p) => !p.projected);
+  const base = actuals.at(-1) || sorted.at(-1);
+  const seas = base?.seasonality || Array(12).fill(100 / 12);
+  const total = seas.reduce((x, y) => x + y, 0) || 1;
+  const latestRev = base ? analysePeriod(base).revenue : 0;
+  const monthly = seas.map((w, i) => ({
+    m: MONTHS[i],
+    weight: Number(((w / total) * 100).toFixed(1)),
+    rev: Math.round((w / total) * latestRev),
+  }));
+
+  function setMonth(i: number, v: number) {
+    const next = [...seas];
+    next[i] = v;
+    onChange({
+      ...c,
+      periods: c.periods.map((p) => ({ ...p, seasonality: next })),
+    });
+  }
+
+  const peak = monthly.reduce((a, b) => (b.weight > a.weight ? b : a), monthly[0]);
+  const trough = monthly.reduce((a, b) => (b.weight < a.weight ? b : a), monthly[0]);
+
+  return (
+    <div className="space-y-4">
+      <Card className="panel-grad">
+        <CardContent className="flex items-start gap-3 p-4 text-xs text-muted-foreground">
+          <CalendarPlus size={16} className="mt-0.5 shrink-0 text-accent" />
+          <span>
+            How revenue moves through the year. Peaks drive working-capital swings and
+            peak net debt — key to reading a part-year (LTM) number and sizing a
+            revolving facility. Peak: <span className="text-foreground">{peak.m}</span> ·
+            Trough: <span className="text-foreground">{trough.m}</span>.
+          </span>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Monthly revenue profile (latest year)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="m" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} interval={0} />
+                <YAxis tickFormatter={(v) => eur(v)} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} width={52} />
+                <Tooltip
+                  contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: number) => eurFull(v)}
+                />
+                <Bar dataKey="rev" fill="hsl(var(--accent))" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Seasonality weights (% of annual revenue)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {seas.map((v, i) => (
+              <div key={i}>
+                <label className="text-[10px] text-muted-foreground">{MONTHS[i]}</label>
+                <Input
+                  type="number"
+                  value={Number(v.toFixed(1))}
+                  onChange={(e) => setMonth(i, +e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -646,12 +993,21 @@ function InputsView({
   c,
   onUpdatePeriod,
   onRemovePeriod,
+  onAddYear,
 }: {
   c: StatementCase;
   onUpdatePeriod: (id: string, patch: Partial<StatementPeriod>) => void;
   onRemovePeriod: (id: string) => void;
+  onAddYear: () => void;
 }) {
-  const [activePeriod, setActivePeriod] = useState(c.periods.at(-1)?.id || "");
+  const sortedPeriods = [...c.periods].sort(
+    (a, b) => yearOf(a.label) - yearOf(b.label)
+  );
+  const [activePeriod, setActivePeriod] = useState(
+    sortedPeriods.filter((p) => !p.projected).at(-1)?.id ||
+      sortedPeriods.at(-1)?.id ||
+      ""
+  );
   const period = c.periods.find((p) => p.id === activePeriod) || c.periods[0];
   if (!period) return <EmptyState message="Add a period to begin." />;
   const a = analysePeriod(period);
@@ -664,19 +1020,24 @@ function InputsView({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {c.periods.map((p) => (
+        {sortedPeriods.map((p) => (
           <button
             key={p.id}
             onClick={() => setActivePeriod(p.id)}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
               p.id === activePeriod
                 ? "border-accent/40 bg-accent/15 text-accent"
+                : p.projected
+                ? "border-gold/30 bg-gold/10 text-gold hover:bg-gold/20"
                 : "border-border bg-panel text-muted-foreground hover:bg-elevated"
             }`}
           >
             {p.label}
           </button>
         ))}
+        <Button size="sm" variant="secondary" onClick={onAddYear}>
+          <Plus size={13} /> Add year
+        </Button>
       </div>
 
       <div className="flex items-center gap-3">
@@ -1066,135 +1427,6 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
     <div className="rounded-md border border-border bg-elevated px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`mt-0.5 text-sm font-semibold tabular ${highlight ? "text-accent" : ""}`}>{value}</div>
-    </div>
-  );
-}
-
-/* --------------------------- Projection -------------------------------- */
-function ProjectionView({ c, onChange }: { c: StatementCase; onChange: (c: StatementCase) => void }) {
-  const a = analyseCase(c);
-  const [growth, setGrowth] = useState<number | null>(null);
-  const proj = useMemo(() => projectForward(c, growth, 3), [c, growth]);
-  if (!a.latest) return <EmptyState message="Enter at least one period to project." />;
-
-  const chartData = [
-    ...a.periods.map((p) => ({ label: p.label, Revenue: Math.round(p.revenue), EBITDA: Math.round(p.ebitda), type: "actual" })),
-    ...proj.map((p) => ({ label: p.label, Revenue: Math.round(p.revenue), EBITDA: Math.round(p.ebitda), type: "proj" })),
-  ];
-
-  const seas = c.periods.at(-1)?.seasonality || Array(12).fill(100 / 12);
-  const seasTotal = seas.reduce((x, y) => x + y, 0) || 1;
-  const nextYearRev = proj[0]?.revenue || 0;
-  const monthly = seas.map((w, i) => ({ m: MONTHS[i], rev: Math.round((w / seasTotal) * nextYearRev) }));
-
-  const effG = growth !== null ? growth : a.periods.length > 1 ? a.revenueCagr : 5;
-  const isDecline = effG < -0.5;
-
-  return (
-    <div className="space-y-4">
-      <Card className="panel-grad">
-        <CardContent className="flex flex-col gap-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              Forward projection from the latest period, holding the current EBITDA
-              margin constant. Pick a growth rate — or model a{" "}
-              <span className="text-foreground">decline</span>:
-            </div>
-            <Badge variant={isDecline ? "negative" : "positive"}>
-              {isDecline ? "Projected DECLINE" : "Projected GROWTH"} ·{" "}
-              {effG >= 0 ? "+" : ""}
-              {effG.toFixed(0)}%/yr
-            </Badge>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant={growth === null ? "default" : "secondary"} onClick={() => setGrowth(null)}>
-              Auto trend {a.periods.length > 1 ? `(${a.revenueCagr >= 0 ? "+" : ""}${a.revenueCagr.toFixed(0)}%)` : "(5%)"}
-            </Button>
-            {[-15, -10, -5, 5, 10, 15, 20].map((g) => (
-              <Button
-                key={g}
-                size="sm"
-                variant={growth === g ? "default" : "secondary"}
-                className={g < 0 && growth === g ? "bg-negative text-white hover:bg-negative/90" : ""}
-                onClick={() => setGrowth(g)}
-              >
-                {g > 0 ? "+" : ""}
-                {g}%
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue &amp; EBITDA — Actual vs Projected</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ left: 0, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <YAxis tickFormatter={(v) => eur(v)} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} width={50} />
-                <Tooltip contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => eurFull(v)} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Revenue" fill="#4f8ae6" radius={[3, 3, 0, 0]} />
-                <Line dataKey="EBITDA" stroke="hsl(var(--gold))" strokeWidth={2} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Projected Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-2">Year</th>
-                  <th className="px-3 py-2 text-right">Revenue</th>
-                  <th className="px-3 py-2 text-right">EBITDA</th>
-                  <th className="px-4 py-2 text-right">Margin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {proj.map((p) => (
-                  <tr key={p.label} className="border-b border-border/50">
-                    <td className="px-4 py-2 font-medium tabular">{p.label}</td>
-                    <td className="px-3 py-2 text-right tabular">{eurFull(p.revenue)}</td>
-                    <td className="px-3 py-2 text-right tabular text-gold">{eurFull(p.ebitda)}</td>
-                    <td className="px-4 py-2 text-right tabular text-muted-foreground">{p.ebitdaMargin.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Next Year Monthly Revenue (seasonal)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="m" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} interval={0} />
-                  <YAxis tickFormatter={(v) => eur(v)} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} width={44} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--panel))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => eurFull(v)} />
-                  <Bar dataKey="rev" fill="hsl(var(--accent))" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
