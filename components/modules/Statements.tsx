@@ -17,6 +17,8 @@ import {
   Globe,
   Lock,
   Sparkles,
+  DownloadCloud,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { StatementCase, StatementPeriod, PLData, BSData } from "@/lib/types";
@@ -104,6 +106,10 @@ export function Statements() {
   const [selected, setSelected] = useState<string | null>(null);
   const [libShown, setLibShown] = useState(12);
 
+  const [secQuery, setSecQuery] = useState("");
+  const [secLoading, setSecLoading] = useState(false);
+  const [secError, setSecError] = useState<string | null>(null);
+
   const cases = state.statementCases;
   const active = cases.find((c) => c.id === selected) || null;
   const streak = computeStreak(cases);
@@ -144,6 +150,59 @@ export function Statements() {
       return { ...prev, statementCases: [copy, ...prev.statementCases] };
     });
     setSelected(tpl.id);
+  }
+
+  async function importFromSec(query: string) {
+    if (!query.trim()) return;
+    setSecError(null);
+    setSecLoading(true);
+    try {
+      const res = await fetch(`/api/sec?q=${encodeURIComponent(query.trim())}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Import failed");
+      const id = `sec_${json.company.cik}`;
+      const co = json.company as {
+        name: string;
+        sector: string;
+        cik: string;
+        ticker: string;
+        currency: string;
+      };
+      const newCase: StatementCase = {
+        id,
+        name: `${co.name}${co.ticker ? ` (${co.ticker})` : ""}`,
+        createdAt: todayISO(),
+        currency: co.currency,
+        periods: (json.periods as any[]).map((p) => ({
+          id: `${id}_${p.label}`,
+          label: p.label,
+          pl: p.pl,
+          bs: p.bs,
+          seasonality: p.seasonality,
+          segments: p.segments,
+        })),
+        answers: {},
+        guessSector: "",
+        actualSector: co.sector,
+        actualBusiness: co.name,
+        revealed: true,
+        score: 0,
+        notes: `Imported from SEC EDGAR · ${co.ticker || ""} · CIK ${co.cik} · figures as reported (${co.currency}).`,
+      };
+      setState((prev) => ({
+        ...prev,
+        statementCases: [
+          newCase,
+          ...prev.statementCases.filter((c) => c.id !== id),
+        ],
+      }));
+      setSecQuery("");
+      setSelected(id);
+    } catch (e) {
+      setSecError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setSecLoading(false);
+    }
   }
 
   if (active) {
@@ -236,6 +295,59 @@ export function Statements() {
             <Sparkles size={15} /> Analyse today's company
           </Button>
         </div>
+      </Card>
+
+      {/* Import real statements from SEC EDGAR */}
+      <Card className="mb-6 border-accent/30">
+        <CardHeader className="flex-row items-center gap-2">
+          <DownloadCloud size={16} className="text-accent" />
+          <CardTitle>Import real statements from SEC EDGAR</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Type a ticker (or CIK) and pull the company's real consolidated P&amp;L
+            and balance sheet for the last 5 fiscal years, straight from official
+            SEC filings — then analyse and project it like any other reading.
+            Works for US-listed filers (10-K / 20-F).
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={secQuery}
+              onChange={(e) => setSecQuery(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === "Enter" && !secLoading && importFromSec(secQuery)}
+              placeholder="e.g. AAPL, MSFT, KO, NKE, AMZN…"
+              className="sm:max-w-xs"
+              disabled={secLoading}
+            />
+            <Button onClick={() => importFromSec(secQuery)} disabled={secLoading || !secQuery.trim()}>
+              {secLoading ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Importing…
+                </>
+              ) : (
+                <>
+                  <DownloadCloud size={14} /> Import
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Quick picks:</span>
+            {["AAPL", "MSFT", "KO", "NKE", "AMZN", "TSLA", "PFE", "WMT"].map((t) => (
+              <button
+                key={t}
+                disabled={secLoading}
+                onClick={() => importFromSec(t)}
+                className="rounded border border-border bg-elevated px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-accent/40 hover:text-foreground disabled:opacity-50"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {secError && (
+            <p className="mt-2 text-xs text-negative">⚠ {secError}</p>
+          )}
+        </CardContent>
       </Card>
 
       {/* Where to find official statements */}
