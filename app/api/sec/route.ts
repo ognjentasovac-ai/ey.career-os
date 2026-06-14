@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { fetchSecStatements } from "@/lib/sec";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get("q")?.trim();

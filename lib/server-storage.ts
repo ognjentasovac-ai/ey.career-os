@@ -1,8 +1,17 @@
-import { promises as fs } from "fs";
-import path from "path";
-
 const STATE_KEY = "career-os:state";
-const LOCAL_FILE = path.join(process.cwd(), ".data", "state.json");
+const LOCAL_FILE = ".data/state.json";
+
+/**
+ * Local filesystem fallback — only used in `next dev` / a persistent Node host.
+ * Imported dynamically so the Node `fs` module is never bundled into the
+ * Cloudflare/edge build (where KV is configured and this code never runs).
+ */
+async function localFs() {
+  const { promises: fs } = await import("fs");
+  const path = await import("path");
+  const file = path.join(process.cwd(), LOCAL_FILE);
+  return { fs, path, file };
+}
 
 interface KvConfig {
   url: string;
@@ -44,7 +53,8 @@ export async function readState(): Promise<unknown | null> {
 
   // Local file fallback (works in `next dev` and on a persistent Node host).
   try {
-    const raw = await fs.readFile(LOCAL_FILE, "utf-8");
+    const { fs, file } = await localFs();
+    const raw = await fs.readFile(file, "utf-8");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -71,6 +81,7 @@ export async function writeState(state: unknown): Promise<void> {
   }
 
   // Local file fallback.
-  await fs.mkdir(path.dirname(LOCAL_FILE), { recursive: true });
-  await fs.writeFile(LOCAL_FILE, payload, "utf-8");
+  const { fs, path, file } = await localFs();
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, payload, "utf-8");
 }

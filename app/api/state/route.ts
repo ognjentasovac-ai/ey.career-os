@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readState, writeState, remoteConfigured } from "@/lib/server-storage";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** Optional shared password. If ACCESS_PASSWORD is unset, the API is open. */

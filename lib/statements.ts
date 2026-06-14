@@ -679,11 +679,77 @@ export function computeCashFlow(
 }
 
 /* ------------------------------ Quiz ----------------------------------- */
+export type QuizGradeKind = "buy" | "direction" | "sector" | "open";
+
 export interface QuizQuestion {
   id: string;
   question: string;
   hint: string; // EY-style data-driven talking point
   eyAngle: string;
+  correct: string; // the conclusion the numbers actually support
+  reasoning: string; // how that conclusion was reached, step by step
+  gradeKind: QuizGradeKind; // how the typed answer is checked
+}
+
+export type GradeStatus = "correct" | "partial" | "incorrect" | "self";
+export interface GradeResult {
+  status: GradeStatus;
+  message: string;
+}
+
+/** Check a typed answer against the data-derived correct conclusion. */
+export function gradeQuizAnswer(
+  q: QuizQuestion,
+  userRaw: string,
+  c: StatementCase
+): GradeResult {
+  const user = (userRaw || "").toLowerCase().trim();
+  if (!user)
+    return { status: "self", message: "Type your answer first, then check it." };
+
+  if (q.gradeKind === "buy") {
+    const wantsBuy = q.correct.toUpperCase().includes("BUY");
+    const borderline = q.correct.toUpperCase().includes("BORDERLINE");
+    const saidBuy = /\b(buy|long|kupi|kupovina|acquire|invest)\b/.test(user);
+    const saidPass = /\b(pass|walk|avoid|sell|short|skip|izbegni|odustani)\b/.test(user);
+    if (!saidBuy && !saidPass)
+      return { status: "self", message: `State a clear BUY or PASS to be graded. The data leans: ${q.correct}.` };
+    const userBuy = saidBuy && !saidPass;
+    if (borderline)
+      return { status: "partial", message: `Defensible either way — ${q.correct}.` };
+    if ((wantsBuy && userBuy) || (!wantsBuy && saidPass && !saidBuy))
+      return { status: "correct", message: `On the money — the numbers support ${q.correct}.` };
+    return { status: "incorrect", message: `The data leans the other way: ${q.correct}.` };
+  }
+
+  if (q.gradeKind === "direction") {
+    const target = q.correct.toUpperCase();
+    const saidUp = /\b(grow|growing|rising|up|increas|rast|raste|expand)\b/.test(user);
+    const saidDown = /\b(declin|shrink|falling|down|decreas|pad|opada|contract)\b/.test(user);
+    const saidFlat = /\b(flat|stable|stagnant|ravn|stabiln)\b/.test(user);
+    const userDir =
+      saidUp && !saidDown ? "GROWING" : saidDown && !saidUp ? "DECLINING" : saidFlat ? "FLAT" : "";
+    if (!userDir)
+      return { status: "self", message: `Say growing, declining or flat. Correct: ${q.correct}.` };
+    if (target.includes(userDir))
+      return { status: "correct", message: `Correct — ${q.correct}.` };
+    return { status: "incorrect", message: `Not quite — ${q.correct}.` };
+  }
+
+  if (q.gradeKind === "sector") {
+    const actual = `${c.actualSector || ""} ${c.actualBusiness || ""}`.toLowerCase();
+    if (!actual.trim())
+      return { status: "self", message: "No answer key set for this case — compare with 'Reveal the answer' below." };
+    const tokens = actual.split(/[^a-zčćđšž0-9]+/i).filter((t) => t.length > 3);
+    const hit = tokens.some((t) => user.includes(t));
+    const label = `${c.actualSector}${c.actualBusiness ? " · " + c.actualBusiness : ""}`;
+    return hit
+      ? { status: "correct", message: `Match — actual: ${label}.` }
+      : { status: "incorrect", message: `Off — actual: ${label}.` };
+  }
+
+  // open-ended — self-checked against the model conclusion
+  return { status: "self", message: q.correct };
 }
 
 function fmt(n: number, suffix = ""): string {
@@ -723,6 +789,17 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     a.revenueCagr > 8 ? "strong top-line growth" : a.revenueCagr > 0 ? "modest growth" : "flat/declining revenue";
   const leverageVerdict =
     L.netDebtToEbitda > 4 ? "highly levered" : L.netDebtToEbitda > 2 ? "moderate leverage" : "low leverage / net cash";
+  // Score the buy case from the fundamentals.
+  let buyScore = 0;
+  if (a.revenueCagr > 8) buyScore += 2;
+  else if (a.revenueCagr > 0) buyScore += 1;
+  else buyScore -= 1;
+  if (a.marginDelta > 0) buyScore += 1;
+  else if (a.marginDelta < -1) buyScore -= 1;
+  if (L.netDebtToEbitda < 2) buyScore += 1;
+  else if (L.netDebtToEbitda > 4) buyScore -= 2;
+  if (!L.balances) buyScore -= 1;
+  const buyVerdict = buyScore >= 2 ? "BUY" : buyScore <= 0 ? "PASS" : "BORDERLINE";
   q.push({
     id: "recommendation",
     question:
@@ -736,6 +813,14 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     )}. Profile reads as ${growthVerdict} and ${leverageVerdict}.`,
     eyAngle:
       "Frame it as: quality of growth (organic vs price), margin durability, cash conversion, balance-sheet risk, and what could break the thesis. End with a Buy / Pass call.",
+    correct: `Lean ${buyVerdict}`,
+    reasoning: `Growth: ${growthVerdict} (CAGR ${fmt(a.revenueCagr, "%")}). Margin: ${
+      a.marginDelta >= 0 ? "expanding" : "compressing"
+    } (${a.marginDelta >= 0 ? "+" : ""}${fmt(a.marginDelta, "ppt")}). Balance sheet: ${leverageVerdict} (${fmt(
+      L.netDebtToEbitda,
+      "x"
+    )}) and it ${L.balances ? "balances" : "does NOT balance — a flag"}. Net those signals out and the case leans ${buyVerdict}.`,
+    gradeKind: "buy",
   });
 
   // 2 — Growth or decline drivers + projection direction
@@ -756,6 +841,19 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     )}. Biggest segment move: ${mover || "add segments to see"}.`,
     eyAngle:
       "Separate volume vs price vs mix. Decide if the driver is structural (market growth, share gains, new products) or cyclical/one-off — that decides whether you project continued growth or a decline. Use the Projection tab to test both.",
+    correct: `Revenue is ${dir} (EBITDA ${ebitdaDir})`,
+    reasoning: `Revenue CAGR is ${fmt(a.revenueCagr, "%")} → ${dir}. EBITDA CAGR ${fmt(
+      a.ebitdaCagr,
+      "%"
+    )} → ${ebitdaDir}, with margin ${a.marginDelta >= 0 ? "up" : "down"} ${fmt(
+      Math.abs(a.marginDelta),
+      "ppt"
+    )}. ${mover ? `Biggest segment move: ${mover}.` : ""} ${
+      a.ebitdaCagr > a.revenueCagr
+        ? "EBITDA outpacing revenue signals operating leverage."
+        : "EBITDA lagging revenue signals margin pressure."
+    }`,
+    gradeKind: "direction",
   });
 
   // 2 — Revenue source
@@ -772,6 +870,11 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     hint: `Revenue ${fmt(L.revenue)}. Segment mix: ${segText}. Check concentration risk and which segment drives growth.`,
     eyAngle:
       "EY would test revenue by customer, product, geography and channel — recurring vs one-off, and the top-customer concentration.",
+    correct: `Revenue ${fmt(L.revenue)} — mix: ${segText}`,
+    reasoning: `The segment split shows ${segText}. The largest slice is the concentration risk; the fastest-growing slice (${
+      mover || "n/a"
+    }) is what's actually driving the top line. Durable if recurring and spread across customers; risky if one segment or a few customers dominate.`,
+    gradeKind: "open",
   });
 
   // Cost structure — where does the money go?
@@ -794,6 +897,21 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     }.`,
     eyAngle:
       "Split fixed vs variable. A heavy fixed base (payroll, transport fleet, rent) means EBITDA swings hard with volume — central to the downside case. Identify the cost levers a PE owner could pull.",
+    correct: `COGS ${fmt(pctOf(lp.cogs), "%")} of revenue is the dominant cost; largest opex line after it is ${
+      lp.salaries >= lp.transport && lp.salaries >= lp.opex
+        ? "salaries"
+        : lp.transport >= lp.opex
+        ? "transport / logistics"
+        : "other opex"
+    }`,
+    reasoning: `As % of revenue: COGS ${fmt(pctOf(lp.cogs), "%")}, salaries ${fmt(
+      pctOf(lp.salaries),
+      "%"
+    )}, transport ${fmt(pctOf(lp.transport), "%")}, marketing ${fmt(pctOf(lp.marketing), "%")}, other ${fmt(
+      pctOf(lp.opex),
+      "%"
+    )}. A high COGS share = thin gross margin and volume-driven model; a high payroll/transport share = fixed base that magnifies operating leverage.`,
+    gradeKind: "open",
   });
 
   // 3 — EBITDA quality
@@ -814,6 +932,17 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
       : `EBITDA margin ${fmt(L.ebitdaMargin, "%")}. Add a second year to decompose the change.`,
     eyAngle:
       "Normalise for one-offs (the 'quality of earnings'): are there non-recurring items, capitalised costs, or under-investment in opex inflating EBITDA?",
+    correct: a.bridge
+      ? `Margin move driven mainly by ${marginDriver}`
+      : `EBITDA margin ${fmt(L.ebitdaMargin, "%")} — add a second year to decompose`,
+    reasoning: a.bridge
+      ? `Bridge from ${fmt(a.bridge.fromEbitda)} to ${fmt(a.bridge.toEbitda)}: volume ${fmt(
+          a.bridge.volumeEffect
+        )}, gross-margin ${fmt(a.bridge.grossMarginEffect)}, opex/other ${fmt(
+          a.bridge.otherEffect
+        )}. The largest term is ${marginDriver}, so that's the driver. Sustainable only if it's pricing/mix or genuine efficiency — not under-spend or one-offs.`
+      : `Only one period entered, so the change can't be decomposed. Add a prior year to split volume vs margin vs opex.`,
+    gradeKind: "open",
   });
 
   // Red flags / deal-breakers (EY quality-of-earnings lens)
@@ -836,6 +965,22 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     } Net debt ${eur(L.netDebt)}.`,
     eyAngle:
       "QoE normalises EBITDA for one-offs, owner add-backs and accounting choices — the 'clean' number is what a buyer actually pays a multiple on. Probe receivables build, customer concentration, capex needs and covenant headroom.",
+    correct: [
+      L.netDebtToEbitda > 4 ? "high leverage" : null,
+      conc > 50 ? `customer/segment concentration (${fmt(conc, "%")})` : null,
+      L.currentRatio < 1 ? "weak liquidity (current ratio < 1)" : null,
+      L.cashConversionCycle > 90 ? "long cash cycle" : null,
+      !L.balances ? "balance sheet does not balance" : null,
+    ]
+      .filter(Boolean)
+      .join("; ") || "No headline red flags in the ratios — probe one-offs & capex",
+    reasoning: `Net debt/EBITDA ${fmt(L.netDebtToEbitda, "x")}, current ratio ${fmt(
+      L.currentRatio,
+      "x"
+    )}, cash cycle ${fmt(L.cashConversionCycle, "d")}, top segment ${fmt(conc, "%")} of revenue. ${
+      L.balances ? "Balance sheet balances." : "Balance sheet does NOT balance — investigate first."
+    } Each ratio breaching its threshold (leverage > 4x, current < 1x, concentration > 50%, cycle > 90d) is a deal-breaker to escalate.`,
+    gradeKind: "open",
   });
 
   // 4 — Working capital & cash
@@ -851,6 +996,21 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     )}.`,
     eyAngle:
       "A lengthening cycle or receivables build can mask weakening demand or aggressive revenue recognition.",
+    correct:
+      L.cashConversionCycle < 0
+        ? "Negative cash cycle — the business is funded by suppliers (cash-generative)"
+        : L.cashConversionCycle > 90
+        ? "Long cash cycle ties up cash — working capital is a drag"
+        : "Moderate cash cycle — broadly self-funding",
+    reasoning: `DSO ${fmt(L.dso, "d")} + DIO ${fmt(L.dio, "d")} − DPO ${fmt(
+      L.dpo,
+      "d"
+    )} = cash conversion cycle ${fmt(L.cashConversionCycle, "d")}. ${
+      L.cashConversionCycle < 0
+        ? "Negative means suppliers fund operations — strong cash quality."
+        : "Positive means cash is locked in receivables + inventory; the longer it is, the more growth eats cash."
+    } Current ratio ${fmt(L.currentRatio, "x")} confirms short-term cover.`,
+    gradeKind: "open",
   });
 
   // 5 — Seasonality
@@ -865,6 +1025,15 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
         : "Enter a monthly seasonality profile to analyse intra-year swings.",
     eyAngle:
       "Seasonality affects covenant timing, peak net debt, and how you read a part-year (LTM) number.",
+    correct:
+      peakIdx >= 0
+        ? `Revenue peaks around ${MONTHS[peakIdx]} — needs a revolver for the seasonal swing`
+        : "No seasonality profile entered",
+    reasoning:
+      peakIdx >= 0
+        ? `The monthly profile peaks in ${MONTHS[peakIdx]}. Pre-peak the business builds inventory and draws cash (peak net debt), then unwinds it after the season — so covenants and the revolving facility must be sized to the peak, not the average.`
+        : "Enter a monthly seasonality profile to judge intra-year cash swings.",
+    gradeKind: "open",
   });
 
   // 6 — Valuation
@@ -876,6 +1045,16 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     )} of EV. Net debt ${fmt(L.netDebt)} bridges EV to equity value.`,
     eyAngle:
       "Anchor to comparable transactions and trading comps for the sector, then adjust for growth, margin and risk.",
+    correct: `A defensible range is ~${(a.revenueCagr > 8 ? 8 : a.revenueCagr > 0 ? 6 : 4)}–${(a.revenueCagr > 8 ? 12 : a.revenueCagr > 0 ? 9 : 6)}x EV/EBITDA → EV ≈ ${fmt(
+      L.ebitda * (a.revenueCagr > 8 ? 8 : a.revenueCagr > 0 ? 6 : 4)
+    )}–${fmt(L.ebitda * (a.revenueCagr > 8 ? 12 : a.revenueCagr > 0 ? 9 : 6))}`,
+    reasoning: `Higher growth + expanding margin earns a higher multiple; leverage and concentration pull it down. With CAGR ${fmt(
+      a.revenueCagr,
+      "%"
+    )} and margin ${a.marginDelta >= 0 ? "expanding" : "compressing"}, anchor mid-range. Each 1.0x = ${fmt(
+      L.ebitda
+    )} of EV; net debt ${fmt(L.netDebt)} bridges EV down to equity value.`,
+    gradeKind: "open",
   });
 
   // 7 — Sector guess
@@ -892,6 +1071,17 @@ export function buildQuiz(c: StatementCase): QuizQuestion[] {
     )}), and seasonality.`,
     eyAngle:
       "Margin structure + asset intensity + working-capital shape is usually enough to fingerprint the sector.",
+    correct: c.actualSector
+      ? `${c.actualSector}${c.actualBusiness ? " — " + c.actualBusiness : ""}`
+      : "Set the actual sector in 'Reveal the answer' to enable grading",
+    reasoning: `Fingerprints: gross margin ${fmt(L.grossMargin, "%")} (high → software/services, low → retail/distribution), inventory ${fmt(
+      L.dio,
+      "d"
+    )} (high → manufacturing/retail, ~0 → services), PP&E ${fmt(
+      safeDiv(c.periods.at(-1)!.bs.ppe, L.revenue) * 100,
+      "% of revenue"
+    )} (capital intensity), plus the seasonality shape. Together those usually pin the sector.`,
+    gradeKind: "sector",
   });
 
   return q;

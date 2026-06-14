@@ -9,6 +9,8 @@ import {
   LineChart as LineIcon,
   HelpCircle,
   Eye,
+  Check,
+  BookOpen,
   Layers3,
   CalendarPlus,
   Flame,
@@ -43,6 +45,8 @@ import {
   withProjection,
   caseCashFlows,
   yearOf,
+  gradeQuizAnswer,
+  type GradeResult,
 } from "@/lib/statements";
 import {
   Card,
@@ -58,6 +62,7 @@ import {
   EmptyState,
 } from "../ui";
 import { KpiCard } from "../shared";
+import CasePlaybook from "./CasePlaybook";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -524,7 +529,7 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* --------------------------- Case detail ------------------------------- */
-type View = "reports" | "edit" | "seasonality" | "analysis" | "quiz";
+type View = "reports" | "edit" | "seasonality" | "analysis" | "quiz" | "playbook";
 
 function CaseDetail({
   c,
@@ -575,6 +580,7 @@ function CaseDetail({
     { key: "analysis", label: "Analysis", icon: <LineIcon size={14} /> },
     { key: "edit", label: "Edit data", icon: <Calculator size={14} /> },
     { key: "quiz", label: "EY Quiz", icon: <HelpCircle size={14} /> },
+    { key: "playbook", label: "Case Playbook", icon: <BookOpen size={14} /> },
   ];
 
   return (
@@ -637,6 +643,7 @@ function CaseDetail({
         />
       )}
       {view === "quiz" && <QuizView c={c} onChange={onChange} />}
+      {view === "playbook" && <CasePlaybook />}
     </div>
   );
 }
@@ -1435,6 +1442,7 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 function QuizView({ c, onChange }: { c: StatementCase; onChange: (c: StatementCase) => void }) {
   const quiz = useMemo(() => buildQuiz(c), [c]);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [graded, setGraded] = useState<Record<string, GradeResult>>({});
 
   if (!c.periods.length || !c.periods.some((p) => p.pl.revenue))
     return <EmptyState message="Enter the P&L and balance sheet first, then take the quiz." />;
@@ -1469,13 +1477,57 @@ function QuizView({ c, onChange }: { c: StatementCase; onChange: (c: StatementCa
               placeholder="Your analysis…"
               className="min-h-[80px]"
             />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setRevealed((r) => ({ ...r, [q.id]: !r[q.id] }))}
-            >
-              <Eye size={13} /> {revealed[q.id] ? "Hide" : "Reveal"} talking points
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() =>
+                  setGraded((g) => ({ ...g, [q.id]: gradeQuizAnswer(q, c.answers[q.id] || "", c) }))
+                }
+              >
+                <Check size={13} /> Check my answer
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setRevealed((r) => ({ ...r, [q.id]: !r[q.id] }))}
+              >
+                <Eye size={13} /> {revealed[q.id] ? "Hide" : "Reveal"} talking points
+              </Button>
+            </div>
+            {graded[q.id] &&
+              (() => {
+                const g = graded[q.id];
+                const tone =
+                  g.status === "correct"
+                    ? "border-green-500/50 bg-green-500/10 text-green-400"
+                    : g.status === "incorrect"
+                    ? "border-red-500/50 bg-red-500/10 text-red-400"
+                    : g.status === "partial"
+                    ? "border-gold/50 bg-gold/10 text-gold"
+                    : "border-accent/40 bg-accent/10 text-accent";
+                const label =
+                  g.status === "correct"
+                    ? "On the money"
+                    : g.status === "incorrect"
+                    ? "Off"
+                    : g.status === "partial"
+                    ? "Defensible"
+                    : "Self-check";
+                return (
+                  <div className={`space-y-2 rounded-md border p-3 text-xs ${tone}`}>
+                    <p className="font-semibold uppercase tracking-wide">{label}</p>
+                    <p className="text-foreground">{g.message}</p>
+                    <p className="text-foreground">
+                      <span className="font-medium text-gold">Correct conclusion: </span>
+                      {q.correct}
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-accent">How we got there: </span>
+                      {q.reasoning}
+                    </p>
+                  </div>
+                );
+              })()}
             {revealed[q.id] && (
               <div className="space-y-2 rounded-md border border-border bg-elevated p-3 text-xs">
                 <p>
