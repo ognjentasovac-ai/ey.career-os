@@ -29,8 +29,16 @@ function F({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Note({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs leading-relaxed text-muted-foreground">{children}</p>;
+function Note({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <p className={`text-xs leading-relaxed text-muted-foreground ${className}`}>{children}</p>
+  );
 }
 
 function H({ children }: { children: React.ReactNode }) {
@@ -152,7 +160,7 @@ function buildSections(): Section[] {
             <F>CapEx → CFI (−); ↑ PP&amp;E (BS)</F>
             <F>Krediti +/−, emisija akcija, dividende → CFF; menja dug/kapital (BS)</F>
             <F>Krajnji keš (CF) = red „Gotovina" u bilansu stanja</F>
-            <F className="">AKTIVA = OBAVEZE + KAPITAL (bilans uvek mora da balansira)</F>
+            <F>AKTIVA = OBAVEZE + KAPITAL (bilans uvek mora da balansira)</F>
           </div>
           <Note>
             <span className="text-gold">Mnemonik:</span> „Svaka promena u bilansu stanja ima posledicu u

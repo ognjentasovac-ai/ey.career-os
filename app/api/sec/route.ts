@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchSecStatements } from "@/lib/sec";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {

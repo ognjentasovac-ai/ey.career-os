@@ -15,3 +15,8 @@ next-env.d.ts
 dev.log
 
 .vercel
+
+# Build artifacts
+/.open-next
+cf_build.log
+.wrangler

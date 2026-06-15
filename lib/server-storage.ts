@@ -13,6 +13,27 @@ async function localFs() {
   return { fs, path, file };
 }
 
+interface KVNamespace {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+}
+
+/**
+ * Cloudflare Workers KV binding (when running on Cloudflare via OpenNext).
+ * Dynamically resolved so `next dev` and the SEC route keep working locally,
+ * where the OpenNext context is absent and we fall back to file / Upstash.
+ */
+async function cfKv(): Promise<KVNamespace | null> {
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const ctx = getCloudflareContext();
+    const ns = (ctx?.env as Record<string, unknown> | undefined)?.CAREER_OS_KV;
+    return (ns as KVNamespace) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 interface KvConfig {
   url: string;
   token: string;
@@ -35,6 +56,17 @@ export function remoteConfigured(): boolean {
 }
 
 export async function readState(): Promise<unknown | null> {
+  const kv = await cfKv();
+  if (kv) {
+    const raw = await kv.get(STATE_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
   const cfg = kvConfig();
   if (cfg) {
     const res = await fetch(`${cfg.url}/get/${STATE_KEY}`, {
@@ -62,9 +94,15 @@ export async function readState(): Promise<unknown | null> {
 }
 
 export async function writeState(state: unknown): Promise<void> {
-  const cfg = kvConfig();
   const payload = JSON.stringify(state);
 
+  const kv = await cfKv();
+  if (kv) {
+    await kv.put(STATE_KEY, payload);
+    return;
+  }
+
+  const cfg = kvConfig();
   if (cfg) {
     const res = await fetch(`${cfg.url}/set/${STATE_KEY}`, {
       method: "POST",

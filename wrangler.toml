@@ -1,4 +1,18 @@
-name = "career-os"
-compatibility_date = "2024-11-01"
+name = "eycareeros"
+main = ".open-next/worker.js"
+compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+
+# Cloudflare runs this before deploying (on its Linux builders), so the
+# OpenNext build happens server-side — avoids the Windows-only build bugs.
+[build]
+command = "npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# Cloudflare KV — persistent storage for the app state (set id after creating the namespace).
+[[kv_namespaces]]
+binding = "CAREER_OS_KV"
+id = "3d8884f0ec2b40e59318b1358d518577"
