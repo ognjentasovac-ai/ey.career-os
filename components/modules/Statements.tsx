@@ -12,6 +12,7 @@ import {
   Check,
   BookOpen,
   FileText,
+  Sigma,
   Layers3,
   CalendarPlus,
   Flame,
@@ -65,6 +66,7 @@ import {
 import { KpiCard } from "../shared";
 import CasePlaybook from "./CasePlaybook";
 import AnalystView from "./AnalystView";
+import Formulas from "./Formulas";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -531,7 +533,7 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* --------------------------- Case detail ------------------------------- */
-type View = "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook";
+type View = "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook" | "formulas";
 
 function CaseDetail({
   c,
@@ -584,6 +586,7 @@ function CaseDetail({
     { key: "edit", label: "Edit data", icon: <Calculator size={14} /> },
     { key: "quiz", label: "EY Quiz", icon: <HelpCircle size={14} /> },
     { key: "playbook", label: "Case Playbook", icon: <BookOpen size={14} /> },
+    { key: "formulas", label: "Formulas", icon: <Sigma size={14} /> },
   ];
 
   return (
@@ -648,6 +651,7 @@ function CaseDetail({
       {view === "quiz" && <QuizView c={c} onChange={onChange} />}
       {view === "analyst" && <AnalystView c={c} />}
       {view === "playbook" && <CasePlaybook />}
+      {view === "formulas" && <Formulas />}
     </div>
   );
 }
