@@ -23,8 +23,8 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@opennextjs/cloudflare": "^1.19.11",
+    "esbuild": "0.25.4",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

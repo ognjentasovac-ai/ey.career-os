@@ -1,0 +1,66 @@
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+OpenNext project detected, calling `opennextjs-cloudflare deploy`
+
+┌──────────────────────────────┐
+│ OpenNext — Cloudflare deploy │
+└──────────────────────────────┘
+
+WARN OpenNext is not fully compatible with Windows.
+WARN For optimal performance, it is recommended to use Windows Subsystem for Linux (WSL).
+WARN While OpenNext may function on Windows, it could encounter unpredictable failures during runtime.
+Incremental cache does not need populating
+Tag cache does not need populating
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+🌀 Building list of assets...
+✨ Read 25 files from the assets directory C:\Users\ognje\career-os\.open-next\assets
+🌀 Starting asset upload...
+🌀 Found 17 new or modified static assets to upload. Proceeding with upload...
++ /BUILD_ID
++ /_next/static/chunks/app/layout-d071be26925ad7fb.js
++ /_next/static/chunks/main-app-a70deaf7598578fe.js
++ /_next/static/css/a4091235030e5246.css
++ /_next/static/chunks/117-913787bf5459e9ae.js
++ /_next/static/chunks/app/page-ae15444a7ee6cac2.js
++ /_next/static/uyb3QJYJff-3_z6Rje1VY/_ssgManifest.js
++ /_next/static/chunks/pages/_error-28b803cb2479b966.js
++ /_next/static/chunks/app/_not-found/page-47fbbc09fec22bca.js
++ /_next/static/chunks/polyfills-42372ed130431b0a.js
++ /_next/static/chunks/framework-00a8ba1a63cfdc9e.js
++ /_next/static/chunks/320-c057be99b8707d88.js
++ /_next/static/uyb3QJYJff-3_z6Rje1VY/_buildManifest.js
++ /_next/static/chunks/pages/_app-15e2daefa259f0b5.js
++ /_next/static/chunks/webpack-d757b501b8c835e1.js
++ /_next/static/chunks/main-89483a10b2106e8d.js
++ /_next/static/chunks/fd9d1056-4fe38b7e2fa67274.js
+Uploaded 5 of 17 assets
+Uploaded 11 of 17 assets
+Uploaded 17 of 17 assets
+✨ Success! Uploaded 17 files (3.31 sec)
+
+Total Upload: 3917.61 KiB / gzip: 839.33 KiB
+Worker Startup Time: 23 ms
+Your Worker has access to the following bindings:
+Binding                                                  Resource          
+env.CAREER_OS_KV (3d8884f0ec2b40e59318b1358d518577)      KV Namespace      
+env.ASSETS                                               Assets            
+
+Uploaded eycareeros (19.39 sec)
+Deployed eycareeros triggers (5.37 sec)
+  https://eycareeros.ognjen-tasovac.workers.dev
+Current Version ID: c4422fef-5554-40c7-a79a-c57765d0aee8
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mBecause 'workers_dev' is not in your Wrangler file, it will be enabled for this deployment by default.[0m
+
+  To override this setting, you can disable workers.dev by explicitly setting 'workers_dev = false' in your Wrangler file.
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mBecause your 'workers.dev' route is enabled and your 'preview_urls' setting is not in your Wrangler file, Preview URLs will be enabled for this deployment by default.[0m
+
+  To override this setting, you can disable Preview URLs by explicitly setting 'preview_urls = false' in your Wrangler file.
+
+
+(node:34416) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
