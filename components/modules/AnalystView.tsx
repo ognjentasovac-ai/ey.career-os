@@ -4,7 +4,17 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, EmptyState } from "../ui";
 import { buildAnalystReport, type AnalystLang } from "@/lib/statements";
 import type { StatementCase } from "@/lib/types";
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Building2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Building2, Search, ExternalLink } from "lucide-react";
+
+const REGISTRIES: { label: string; note: string; url: string }[] = [
+  { label: "SEC EDGAR", note: "US — zvanični 10-K/20-F filings (besplatno)", url: "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany" },
+  { label: "APR Srbija", note: "Srbija — finansijski izveštaji privrednih društava", url: "https://pretraga2.apr.gov.rs/unifiedentitysearch" },
+  { label: "BELEX", note: "Beogradska berza — listirane RS kompanije", url: "https://www.belex.rs" },
+  { label: "ZSE / LJSE", note: "Zagrebačka / Ljubljanska berza", url: "https://zse.hr" },
+  { label: "Companies House", note: "UK — zvanični registar i izveštaji", url: "https://find-and-update.company-information.service.gov.uk" },
+  { label: "Bundesanzeiger", note: "Nemačka — zvanični finansijski izveštaji", url: "https://www.bundesanzeiger.de" },
+  { label: "EU e-Justice (BRIS)", note: "Pretraga firmi kroz sve EU registre", url: "https://e-justice.europa.eu/content_find_a_company-489-en.do" },
+];
 
 const toneStyle: Record<string, string> = {
   pos: "border-green-500/40",
@@ -70,6 +80,41 @@ export default function AnalystView({ c }: { c: StatementCase }) {
               "Automatski iz izveštaja ove firme — menja se uživo kako menjaš podatke. Kako bi je pročitao profesionalni analitičar."
             )}
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Reveal & verify on official registries */}
+      <Card className="border-gold/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+            <Search size={15} className="text-gold" />{" "}
+            {t("Reveal & verify on official registries", "Otkrij i proveri na zvaničnim registrima")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {t(
+              "This daily case is a training archetype (synthetic) — not a real filing. To reveal what it represents, open the EY Quiz tab and press “Reveal the answer”. For real, 99%-accurate statements, import a US ticker in the lab (loads real SEC filings) or pull the official report from a registry below.",
+              "Ovaj dnevni slučaj je trening-arhetip (sintetički) — nije stvarni izveštaj. Da vidiš šta predstavlja, otvori tab EY Quiz i pritisni „Reveal the answer“. Za stvarne, 99% tačne izveštaje, importuj US ticker u labu (učitava prave SEC filinge) ili povuci zvanični izveštaj sa registra ispod."
+            )}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {REGISTRIES.map((r) => (
+              <a
+                key={r.label}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 rounded-md border border-border bg-elevated p-2.5 transition-colors hover:border-accent/50"
+              >
+                <ExternalLink size={13} className="mt-0.5 shrink-0 text-accent" />
+                <span className="text-xs">
+                  <span className="font-medium text-foreground">{r.label}</span>
+                  <span className="block text-[11px] text-muted-foreground">{r.note}</span>
+                </span>
+              </a>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

@@ -774,17 +774,17 @@ export function buildAnalystReport(
   else if (inv > 45 && cap > 12) gkey = "manufacturing";
   else if (gm >= 30 && gm <= 52) gkey = "fmcg";
   else gkey = "diversified";
-  const guesses: Record<string, { sector: [string, string]; ex: [string, string]; alt: [string, string] }> = {
-    software: { sector: ["software / SaaS", "softver / SaaS"], ex: ["an enterprise-software or subscription platform", "enterprise softver ili pretplatničku platformu"], alt: ["an internet / marketplace business", "internet / marketplace biznis"] },
-    pharma: { sector: ["pharmaceuticals", "farmacija"], ex: ["a branded or generic drug maker", "proizvođača brendiranih ili generičkih lekova"], alt: ["medical devices or consumer health", "medicinske uređaje ili consumer-health"] },
-    luxury: { sector: ["luxury / branded consumer", "luksuz / brendirana roba"], ex: ["a premium brand or spirits house", "premium brend ili proizvođača pića"], alt: ["cosmetics or medical devices", "kozmetiku ili medicinske uređaje"] },
-    utility: { sector: ["utilities / infrastructure", "komunalije / infrastruktura"], ex: ["a power, water or telecom-network operator", "operatora struje, vode ili telekom mreže"], alt: ["telecom or transport infrastructure", "telekom ili saobraćajnu infrastrukturu"] },
-    heavy: { sector: ["heavy industry / energy", "teška industrija / energetika"], ex: ["an oil & gas, metals, cement or shipping company", "naftnu, metalsku, cementnu ili brodarsku firmu"], alt: ["chemicals or capital-goods manufacturing", "hemiju ili proizvodnju kapitalne opreme"] },
-    grocery: { sector: ["grocery / food retail", "maloprodaja hrane"], ex: ["a supermarket chain or food distributor", "lanac supermarketa ili distributera hrane"], alt: ["a discount or convenience retailer", "diskontni ili convenience retail"] },
-    transport: { sector: ["logistics / transport", "logistika / transport"], ex: ["a trucking, airline or shipping operator", "kamionskog, avio ili brodskog operatora"], alt: ["a postal / parcel-delivery business", "poštanski / dostavni biznis"] },
-    manufacturing: { sector: ["manufacturing / industrials", "proizvodnja / industrija"], ex: ["an auto-parts, machinery or electronics maker", "proizvođača auto-delova, mašina ili elektronike"], alt: ["a building-materials or industrial-goods firm", "firmu za građevinski materijal ili industrijsku robu"] },
-    fmcg: { sector: ["consumer goods / FMCG", "roba široke potrošnje / FMCG"], ex: ["a packaged-food, beverage or household-products company", "firmu za pakovanu hranu, pića ili kućne proizvode"], alt: ["a branded apparel or personal-care business", "brendiranu odeću ili ličnu negu"] },
-    diversified: { sector: ["diversified industrials / services", "diverzifikovana industrija / usluge"], ex: ["a mixed industrial or services group", "mešovitu industrijsku ili uslužnu grupu"], alt: ["a distribution or business-services firm", "distribuciju ili poslovne usluge"] },
+  const guesses: Record<string, { sector: [string, string]; ex: [string, string]; alt: [string, string]; peers: string }> = {
+    software: { sector: ["software / SaaS", "softver / SaaS"], ex: ["an enterprise-software or subscription platform", "enterprise softver ili pretplatničku platformu"], alt: ["an internet / marketplace business", "internet / marketplace biznis"], peers: "SAP, Microsoft, Salesforce; regionalno: Span, Asseco SEE" },
+    pharma: { sector: ["pharmaceuticals", "farmacija"], ex: ["a branded or generic drug maker", "proizvođača brendiranih ili generičkih lekova"], alt: ["medical devices or consumer health", "medicinske uređaje ili consumer-health"], peers: "Krka, Novartis, Pfizer; regionalno: Hemofarm, Alkaloid, Galenika" },
+    luxury: { sector: ["luxury / branded consumer", "luksuz / brendirana roba"], ex: ["a premium brand or spirits house", "premium brend ili proizvođača pića"], alt: ["cosmetics or medical devices", "kozmetiku ili medicinske uređaje"], peers: "LVMH, Diageo; regionalno: Atlantic Grupa (Argeta/Cedevita)" },
+    utility: { sector: ["utilities / infrastructure", "komunalije / infrastruktura"], ex: ["a power, water or telecom-network operator", "operatora struje, vode ili telekom mreže"], alt: ["telecom or transport infrastructure", "telekom ili saobraćajnu infrastrukturu"], peers: "EPS, HEP, Hidroelectrica, OTE, Telekom Srbija" },
+    heavy: { sector: ["heavy industry / energy", "teška industrija / energetika"], ex: ["an oil & gas, metals, cement or shipping company", "naftnu, metalsku, cementnu ili brodarsku firmu"], alt: ["chemicals or capital-goods manufacturing", "hemiju ili proizvodnju kapitalne opreme"], peers: "NIS, INA, OMV Petrom, ArcelorMittal, Zijin (Bor)" },
+    grocery: { sector: ["grocery / food retail", "maloprodaja hrane"], ex: ["a supermarket chain or food distributor", "lanac supermarketa ili distributera hrane"], alt: ["a discount or convenience retailer", "diskontni ili convenience retail"], peers: "Fortenova/Konzum, Mercator, Delhaize/Maxi, Lidl" },
+    transport: { sector: ["logistics / transport", "logistika / transport"], ex: ["a trucking, airline or shipping operator", "kamionskog, avio ili brodskog operatora"], alt: ["a postal / parcel-delivery business", "poštanski / dostavni biznis"], peers: "DHL, Air Serbia, Maersk; regionalno: Nelt, Milšped" },
+    manufacturing: { sector: ["manufacturing / industrials", "proizvodnja / industrija"], ex: ["an auto-parts, machinery or electronics maker", "proizvođača auto-delova, mašina ili elektronike"], alt: ["a building-materials or industrial-goods firm", "firmu za građevinski materijal ili industrijsku robu"], peers: "Bosch, Continental; regionalno: Gorenje, Končar, Tigar" },
+    fmcg: { sector: ["consumer goods / FMCG", "roba široke potrošnje / FMCG"], ex: ["a packaged-food, beverage or household-products company", "firmu za pakovanu hranu, pića ili kućne proizvode"], alt: ["a branded apparel or personal-care business", "brendiranu odeću ili ličnu negu"], peers: "Nestlé, Coca-Cola HBC, Podravka, Bambi, Knjaz Miloš" },
+    diversified: { sector: ["diversified industrials / services", "diverzifikovana industrija / usluge"], ex: ["a mixed industrial or services group", "mešovitu industrijsku ili uslužnu grupu"], alt: ["a distribution or business-services firm", "distribuciju ili poslovne usluge"], peers: "Delta Holding, MK Group, Adris Grupa" },
   };
   const guess = guesses[gkey];
   sections.push({
@@ -799,6 +799,10 @@ export function buildAnalystReport(
       t(
         `The fingerprint pointing there: gross margin ${fmt(gm, "%")}, PP&E ${fmt(cap, "% of revenue")}, inventory ${fmt(inv, " days")}, cash cycle ${fmt(ccc, " days")}, EBITDA margin ${fmt(em, "%")}. Most probable sector: ${guess.sector[0]}.`,
         `Otisak koji na to ukazuje: bruto marža ${fmt(gm, "%")}, NPO ${fmt(cap, "% prihoda")}, zalihe ${fmt(inv, " dana")}, ciklus keša ${fmt(ccc, " dana")}, EBITDA marža ${fmt(em, "%")}. Najverovatniji sektor: ${guess.sector[1]}.`
+      ),
+      t(
+        `Which company? Closest real comparables by profile (a fingerprint match, NOT a claim of identity): ${guess.peers}. Confirm the real identity below — reveal the case, or pull the official filing from a registry.`,
+        `Koja firma? Najbliže stvarne uporedne firme po profilu (poklapanje otiska, NE tvrdnja o identitetu): ${guess.peers}. Potvrdi pravi identitet ispod — otkrij slučaj ili povuci zvanični izveštaj sa registra.`
       ),
     ],
   });
