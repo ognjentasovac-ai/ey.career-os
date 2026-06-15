@@ -757,6 +757,52 @@ export function buildAnalystReport(
   // ---- Sections ----------------------------------------------------------
   const sections: AnalystSection[] = [];
 
+  // 0. Analyst's identity / sector guess (from the fingerprint, not the answer key)
+  const gm = L.grossMargin;
+  const em = L.ebitdaMargin;
+  const cap = ppeIntensity;
+  const inv = L.dio;
+  const ccc = L.cashConversionCycle;
+  let gkey: string;
+  if (gm > 70 && cap < 15 && inv < 20) gkey = "software";
+  else if (gm > 60 && inv > 35) gkey = "pharma";
+  else if (gm > 55 && cap < 25) gkey = "luxury";
+  else if (cap > 40 && em > 28) gkey = "utility";
+  else if (cap > 35) gkey = "heavy";
+  else if (gm < 25 && ccc < 10 && cap < 20) gkey = "grocery";
+  else if (gm < 28 && cap > 22) gkey = "transport";
+  else if (inv > 45 && cap > 12) gkey = "manufacturing";
+  else if (gm >= 30 && gm <= 52) gkey = "fmcg";
+  else gkey = "diversified";
+  const guesses: Record<string, { sector: [string, string]; ex: [string, string]; alt: [string, string] }> = {
+    software: { sector: ["software / SaaS", "softver / SaaS"], ex: ["an enterprise-software or subscription platform", "enterprise softver ili pretplatničku platformu"], alt: ["an internet / marketplace business", "internet / marketplace biznis"] },
+    pharma: { sector: ["pharmaceuticals", "farmacija"], ex: ["a branded or generic drug maker", "proizvođača brendiranih ili generičkih lekova"], alt: ["medical devices or consumer health", "medicinske uređaje ili consumer-health"] },
+    luxury: { sector: ["luxury / branded consumer", "luksuz / brendirana roba"], ex: ["a premium brand or spirits house", "premium brend ili proizvođača pića"], alt: ["cosmetics or medical devices", "kozmetiku ili medicinske uređaje"] },
+    utility: { sector: ["utilities / infrastructure", "komunalije / infrastruktura"], ex: ["a power, water or telecom-network operator", "operatora struje, vode ili telekom mreže"], alt: ["telecom or transport infrastructure", "telekom ili saobraćajnu infrastrukturu"] },
+    heavy: { sector: ["heavy industry / energy", "teška industrija / energetika"], ex: ["an oil & gas, metals, cement or shipping company", "naftnu, metalsku, cementnu ili brodarsku firmu"], alt: ["chemicals or capital-goods manufacturing", "hemiju ili proizvodnju kapitalne opreme"] },
+    grocery: { sector: ["grocery / food retail", "maloprodaja hrane"], ex: ["a supermarket chain or food distributor", "lanac supermarketa ili distributera hrane"], alt: ["a discount or convenience retailer", "diskontni ili convenience retail"] },
+    transport: { sector: ["logistics / transport", "logistika / transport"], ex: ["a trucking, airline or shipping operator", "kamionskog, avio ili brodskog operatora"], alt: ["a postal / parcel-delivery business", "poštanski / dostavni biznis"] },
+    manufacturing: { sector: ["manufacturing / industrials", "proizvodnja / industrija"], ex: ["an auto-parts, machinery or electronics maker", "proizvođača auto-delova, mašina ili elektronike"], alt: ["a building-materials or industrial-goods firm", "firmu za građevinski materijal ili industrijsku robu"] },
+    fmcg: { sector: ["consumer goods / FMCG", "roba široke potrošnje / FMCG"], ex: ["a packaged-food, beverage or household-products company", "firmu za pakovanu hranu, pića ili kućne proizvode"], alt: ["a branded apparel or personal-care business", "brendiranu odeću ili ličnu negu"] },
+    diversified: { sector: ["diversified industrials / services", "diverzifikovana industrija / usluge"], ex: ["a mixed industrial or services group", "mešovitu industrijsku ili uslužnu grupu"], alt: ["a distribution or business-services firm", "distribuciju ili poslovne usluge"] },
+  };
+  const guess = guesses[gkey];
+  sections.push({
+    id: "guess",
+    title: t("Analyst's read — what is it & which sector", "Procena analitičara — šta je i koji sektor"),
+    tone: "neutral",
+    paragraphs: [
+      t(
+        `My best read: this is most likely a ${guess.sector[0]} business — think ${guess.ex[0]}. It could also be ${guess.alt[0]}.`,
+        `Moja procena: ovo je najverovatnije ${guess.sector[1]} biznis — tipa ${guess.ex[1]}. Moglo bi da bude i ${guess.alt[1]}.`
+      ),
+      t(
+        `The fingerprint pointing there: gross margin ${fmt(gm, "%")}, PP&E ${fmt(cap, "% of revenue")}, inventory ${fmt(inv, " days")}, cash cycle ${fmt(ccc, " days")}, EBITDA margin ${fmt(em, "%")}. Most probable sector: ${guess.sector[0]}.`,
+        `Otisak koji na to ukazuje: bruto marža ${fmt(gm, "%")}, NPO ${fmt(cap, "% prihoda")}, zalihe ${fmt(inv, " dana")}, ciklus keša ${fmt(ccc, " dana")}, EBITDA marža ${fmt(em, "%")}. Najverovatniji sektor: ${guess.sector[1]}.`
+      ),
+    ],
+  });
+
   // 1. Business read
   const assetWord = assetHeavy ? t("capital-heavy", "kapitalno-intenzivan") : ppeIntensity > 15 ? t("moderately capital-intensive", "umereno kapitalno-intenzivan") : t("capital-light", "kapitalno-lak");
   const marginNature =
