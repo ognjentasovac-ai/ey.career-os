@@ -39,6 +39,7 @@ export default function AnalystView({ c }: { c: StatementCase }) {
   const [lang, setLang] = useState<AnalystLang>("sr");
   const report = buildAnalystReport(c, lang);
   const t = (en: string, sr: string) => (lang === "sr" ? sr : en);
+  const isReal = c.id.startsWith("sec"); // real SEC filing vs synthetic training case
 
   if (!report.ready)
     return (
@@ -93,10 +94,15 @@ export default function AnalystView({ c }: { c: StatementCase }) {
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {t(
-              "This daily case is a training archetype (synthetic) — not a real filing. To reveal what it represents, open the EY Quiz tab and press “Reveal the answer”. For real, 99%-accurate statements, import a US ticker in the lab (loads real SEC filings) or pull the official report from a registry below.",
-              "Ovaj dnevni slučaj je trening-arhetip (sintetički) — nije stvarni izveštaj. Da vidiš šta predstavlja, otvori tab EY Quiz i pritisni „Reveal the answer“. Za stvarne, 99% tačne izveštaje, importuj US ticker u labu (učitava prave SEC filinge) ili povuci zvanični izveštaj sa registra ispod."
-            )}
+            {isReal
+              ? t(
+                  "This is a REAL company pulled from official SEC filings (figures as reported). To reveal its name, open the EY Quiz tab and press “Reveal the answer”, then verify the exact filing on SEC EDGAR below.",
+                  "Ovo je STVARNA firma povučena iz zvaničnih SEC izveštaja (brojevi kako su prijavljeni). Da otkriješ ime, otvori tab EY Quiz i pritisni „Reveal the answer“, pa proveri tačan izveštaj na SEC EDGAR-u ispod."
+                )
+              : t(
+                  "This case is a training archetype (synthetic) — not a real filing. To reveal what it represents, open the EY Quiz tab and press “Reveal the answer”. For real, 99%-accurate statements, use the SEC daily challenge / import a US ticker, or pull the official report from a registry below.",
+                  "Ovaj slučaj je trening-arhetip (sintetički) — nije stvarni izveštaj. Da vidiš šta predstavlja, otvori tab EY Quiz i pritisni „Reveal the answer“. Za stvarne, 99% tačne izveštaje koristi SEC dnevni izazov / importuj US ticker, ili povuci zvanični izveštaj sa registra ispod."
+                )}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {REGISTRIES.map((r) => (

@@ -121,6 +121,8 @@ export function Statements() {
   const [secQuery, setSecQuery] = useState("");
   const [secLoading, setSecLoading] = useState(false);
   const [secError, setSecError] = useState<string | null>(null);
+  const [realLoading, setRealLoading] = useState(false);
+  const [realError, setRealError] = useState<string | null>(null);
 
   const cases = state.statementCases;
   const active = cases.find((c) => c.id === selected) || null;
@@ -219,6 +221,53 @@ export function Statements() {
     }
   }
 
+  // Daily challenge = a REAL SEC company, identity hidden until reveal.
+  const realTicker = realDailyTicker();
+  const realDailyId = `secdaily_${realTicker}`;
+  const realDailyDone = cases.some((c) => c.id === realDailyId && c.revealed);
+  async function loadDailyReal() {
+    setRealError(null);
+    setRealLoading(true);
+    try {
+      const res = await fetch(`/api/sec?q=${encodeURIComponent(realTicker)}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "SEC fetch failed");
+      const co = json.company as { name: string; sector: string; cik: string; ticker: string; currency: string };
+      const actualPeriods: StatementPeriod[] = (json.periods as any[]).map((p) => ({
+        id: `${realDailyId}_${p.label}`,
+        label: p.label,
+        pl: p.pl,
+        bs: p.bs,
+        seasonality: p.seasonality,
+        segments: p.segments,
+        projected: false,
+      }));
+      const blindCase: StatementCase = {
+        id: realDailyId,
+        name: "Daily challenge — real company (hidden)",
+        createdAt: todayISO(),
+        currency: co.currency,
+        periods: [...actualPeriods, ...projectPeriods(actualPeriods)],
+        answers: {},
+        guessSector: "",
+        actualSector: co.sector,
+        actualBusiness: `${co.name}${co.ticker ? ` (${co.ticker})` : ""} · CIK ${co.cik}`,
+        revealed: false,
+        score: 0,
+        notes: `Real official SEC 10-K filing · figures as reported (${co.currency}). Identity hidden until you reveal — verify at sec.gov.`,
+      };
+      setState((prev) => ({
+        ...prev,
+        statementCases: [blindCase, ...prev.statementCases.filter((c) => c.id !== realDailyId)],
+      }));
+      setSelected(realDailyId);
+    } catch (e) {
+      setRealError(e instanceof Error ? e.message : "SEC fetch failed");
+    } finally {
+      setRealLoading(false);
+    }
+  }
+
   if (active) {
     return (
       <CaseDetail
@@ -279,6 +328,40 @@ export function Statements() {
         <KpiCard label="Open cases" value={cases.length - streak.completed} sub="to analyse & reveal" />
       </div>
 
+      {/* Real Company of the Day — pulled live from SEC EDGAR, identity hidden */}
+      <Card className="mb-6 overflow-hidden border-gold/60">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold">
+              <Globe size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-gold">
+                  Real Company of the Day
+                </span>
+                <Badge variant={realDailyDone ? "positive" : "warning"}>
+                  {realDailyDone ? "Solved ✓" : "Live from SEC"}
+                </Badge>
+              </div>
+              <h3 className="mt-1 font-display text-lg font-semibold">
+                Today&apos;s real mystery filing
+              </h3>
+              <p className="mt-1 max-w-xl text-xs text-muted-foreground">
+                A real US-listed company pulled <span className="text-foreground">live from official SEC 10-K filings</span> —
+                5 actual years + 3 projected. Identity hidden: analyse it blind, then reveal the real
+                name (and verify on sec.gov). The 99%-accurate, registry-sourced challenge.
+              </p>
+              {realError && <p className="mt-2 text-xs text-red-400">{realError}</p>}
+            </div>
+          </div>
+          <Button variant="gold" onClick={loadDailyReal} disabled={realLoading}>
+            {realLoading ? <Loader2 size={15} className="animate-spin" /> : <Globe size={15} />}
+            {realLoading ? "Pulling from SEC…" : "Analyse today's real company"}
+          </Button>
+        </div>
+      </Card>
+
       {/* Company of the day */}
       <Card className="mb-6 overflow-hidden border-gold/40">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -288,20 +371,20 @@ export function Statements() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-gold">
-                  Company of the Day
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-accent">
+                  Practice Company (synthetic)
                 </span>
                 <Badge variant={dailyDone ? "positive" : "warning"}>
-                  {dailyDone ? "Solved ✓" : "Unsolved"}
+                  {dailyDone ? "Solved ✓" : "Training"}
                 </Badge>
               </div>
               <h3 className="mt-1 font-display text-lg font-semibold">
-                Today's mystery business · #{dailyNumber} of {COMPANY_LIBRARY.length}
+                Synthetic drill · #{dailyNumber} of {COMPANY_LIBRARY.length}
               </h3>
               <p className="mt-1 max-w-xl text-xs text-muted-foreground">
-                Read its P&amp;L, balance sheet and seasonality (5 consolidated years).
-                Decide what it does, which sector it is, whether to buy it and at what
-                price — then reveal. Identity is hidden until you do.
+                A built archetype (not a real filing) for extra reps. Read its P&amp;L, balance
+                sheet and seasonality, decide the sector, whether to buy and at what price — then
+                reveal. For real, registry-sourced data use the SEC challenge above.
               </p>
             </div>
           </div>
@@ -533,6 +616,23 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* --------------------------- Case detail ------------------------------- */
+/** Curated pool of real US-listed filers (10-K) across sectors for the daily challenge. */
+const REAL_DAILY_POOL = [
+  "MSFT", "AAPL", "ORCL", "CRM", "ADBE", "NVDA", "INTC", "CSCO",
+  "WMT", "COST", "KR", "TGT", "HD", "LOW",
+  "KO", "PEP", "PG", "CL", "NKE", "MCD", "SBUX", "MDLZ",
+  "PFE", "JNJ", "MRK", "ABBV", "LLY", "UNH",
+  "CAT", "DE", "BA", "GE", "HON", "MMM", "F", "GM",
+  "XOM", "CVX", "COP",
+  "T", "VZ", "DIS", "NFLX", "CMCSA",
+  "JPM", "V", "MA", "AXP",
+  "UPS", "FDX",
+];
+function realDailyTicker(): string {
+  const epochDay = Math.floor(Date.now() / 86_400_000);
+  return REAL_DAILY_POOL[epochDay % REAL_DAILY_POOL.length];
+}
+
 type View = "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook" | "formulas";
 
 function CaseDetail({
