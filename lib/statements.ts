@@ -686,10 +686,12 @@ export interface AnalystSection {
   tone: "pos" | "neg" | "warn" | "neutral";
 }
 export interface AnalystScenario {
-  name: string; // Bull / Base / Bear
+  name: string; // Bull / Base / Bear — stable key for styling
+  label: string; // localized display name
   tag: string;
   body: string;
 }
+export type AnalystLang = "en" | "sr";
 export interface AnalystReport {
   ready: boolean;
   headline: string;
@@ -704,7 +706,11 @@ export interface AnalystReport {
 }
 
 /** Generates a professional, scenario-aware narrative analysis from the numbers. */
-export function buildAnalystReport(c: StatementCase): AnalystReport {
+export function buildAnalystReport(
+  c: StatementCase,
+  lang: AnalystLang = "en"
+): AnalystReport {
+  const t = (en: string, sr: string) => (lang === "sr" ? sr : en);
   const empty: AnalystReport = {
     ready: false,
     headline: "",
@@ -739,97 +745,132 @@ export function buildAnalystReport(c: StatementCase): AnalystReport {
   const lev = L.netDebtToEbitda;
   const ppeIntensity = safeDiv(lastP.bs.ppe, L.revenue) * 100;
 
-  const growthWord = g > 12 ? "strong" : g > 4 ? "moderate" : g > -1 ? "broadly flat" : "declining";
-  const levWord = lev > 4 ? "highly levered" : lev > 2 ? "moderately levered" : "lightly levered / net-cash";
-  const marginWord = a.marginDelta > 0.5 ? "expanding" : a.marginDelta < -0.5 ? "compressing" : "stable";
+  const assetLight = ppeIntensity <= 15;
+  const assetHeavy = ppeIntensity > 40;
+  const marginUp = a.marginDelta > 0.5;
+  const marginDown = a.marginDelta < -0.5;
+
+  const growthWord = g > 12 ? t("strong", "snažan") : g > 4 ? t("moderate", "umeren") : g > -1 ? t("broadly flat", "uglavnom ravan") : t("declining", "u padu");
+  const levWord = lev > 4 ? t("highly levered", "visoko zadužen") : lev > 2 ? t("moderately levered", "umereno zadužen") : t("lightly levered / net-cash", "blago zadužen / neto-keš");
+  const marginWord = marginUp ? t("expanding", "rastuće") : marginDown ? t("compressing", "opadajuće") : t("stable", "stabilne");
 
   // ---- Sections ----------------------------------------------------------
   const sections: AnalystSection[] = [];
 
   // 1. Business read
-  const assetWord = ppeIntensity > 40 ? "capital-heavy" : ppeIntensity > 15 ? "moderately capital-intensive" : "capital-light";
+  const assetWord = assetHeavy ? t("capital-heavy", "kapitalno-intenzivan") : ppeIntensity > 15 ? t("moderately capital-intensive", "umereno kapitalno-intenzivan") : t("capital-light", "kapitalno-lak");
   const marginNature =
-    L.grossMargin > 70 ? "software / services economics" : L.grossMargin > 40 ? "branded / value-added economics" : "distribution / retail economics";
+    L.grossMargin > 70 ? t("software / services economics", "softver/usluge ekonomiju") : L.grossMargin > 40 ? t("branded / value-added economics", "brendiranu / value-added ekonomiju") : t("distribution / retail economics", "distributivnu / maloprodajnu ekonomiju");
   sections.push({
     id: "business",
-    title: "What this business looks like",
+    title: t("What this business looks like", "Šta je ovo posao"),
     tone: "neutral",
     paragraphs: [
-      `On its financial fingerprint this reads as a ${assetWord} business with ${marginNature}. Gross margin sits at ${fmt(L.grossMargin, "%")}, inventory turns in ${fmt(L.dio, " days")}, and PP&E is ${fmt(ppeIntensity, "% of revenue")} — together that points to ${assetWord === "capital-light" ? "an asset-light model where people/IP, not plant, drive output" : "a model where fixed assets and reinvestment matter to the story"}.`,
-      `Revenue of ${eur(L.revenue)} is ${growthWord} (${fmt(g, "%")} CAGR over the period). The mix and seasonality decide how durable that top line is — recurring, diversified revenue is worth far more than one-off or concentrated revenue.`,
+      t(
+        `On its financial fingerprint this reads as a ${assetWord} business with ${marginNature}. Gross margin sits at ${fmt(L.grossMargin, "%")}, inventory turns in ${fmt(L.dio, " days")}, and PP&E is ${fmt(ppeIntensity, "% of revenue")} — together that points to ${assetLight ? "an asset-light model where people/IP, not plant, drive output" : "a model where fixed assets and reinvestment matter to the story"}.`,
+        `Po finansijskom otisku ovo izgleda kao ${assetWord} biznis sa ${marginNature}. Bruto marža je ${fmt(L.grossMargin, "%")}, zalihe se obrnu za ${fmt(L.dio, " dana")}, a NPO je ${fmt(ppeIntensity, "% prihoda")} — zajedno to ukazuje na ${assetLight ? "asset-light model gde ljudi/IP, a ne postrojenja, prave učinak" : "model gde fiksna imovina i reinvestiranje nose priču"}.`
+      ),
+      t(
+        `Revenue of ${eur(L.revenue)} is ${growthWord} (${fmt(g, "%")} CAGR over the period). The mix and seasonality decide how durable that top line is — recurring, diversified revenue is worth far more than one-off or concentrated revenue.`,
+        `Prihod od ${eur(L.revenue)} je ${growthWord} (${fmt(g, "%")} CAGR kroz period). Miks i sezonalnost odlučuju koliko je taj prihod održiv — ponavljajući, diverzifikovan prihod vredi mnogo više od jednokratnog ili koncentrisanog.`
+      ),
     ],
   });
 
   // 2. Profitability
   sections.push({
     id: "profit",
-    title: profitable ? "Yes — it is profitable" : "Not yet profitable",
+    title: profitable ? t("Yes — it is profitable", "Da — profitabilna je") : t("Not yet profitable", "Još nije profitabilna"),
     tone: profitable ? "pos" : "neg",
     paragraphs: [
-      `The company converts ${eur(L.revenue)} of revenue into ${eur(L.ebitda)} of EBITDA (${fmt(L.ebitdaMargin, "%")} margin) and ${eur(L.netIncome)} of net income (${fmt(L.netMargin, "%")} net margin). Margins are ${marginWord}${multi ? ` — ${a.marginDelta >= 0 ? "+" : ""}${fmt(a.marginDelta, " ppt")} versus the first year` : ""}.`,
+      t(
+        `The company converts ${eur(L.revenue)} of revenue into ${eur(L.ebitda)} of EBITDA (${fmt(L.ebitdaMargin, "%")} margin) and ${eur(L.netIncome)} of net income (${fmt(L.netMargin, "%")} net margin). Margins are ${marginWord}${multi ? ` — ${a.marginDelta >= 0 ? "+" : ""}${fmt(a.marginDelta, " ppt")} versus the first year` : ""}.`,
+        `Firma pretvara ${eur(L.revenue)} prihoda u ${eur(L.ebitda)} EBITDA (${fmt(L.ebitdaMargin, "%")} marža) i ${eur(L.netIncome)} neto dobiti (${fmt(L.netMargin, "%")} neto marža). Marže su ${marginWord}${multi ? ` — ${a.marginDelta >= 0 ? "+" : ""}${fmt(a.marginDelta, " pp")} u odnosu na prvu godinu` : ""}.`
+      ),
       cf
-        ? `Earnings quality looks ${cf.cfo >= L.netIncome ? "solid — operating cash flow of " + eur(cf.cfo) + " covers reported net income, so profit is backed by cash" : "soft — operating cash flow of " + eur(cf.cfo) + " trails net income, a flag that profit is partly on paper (receivables build, capitalised costs)"}.`
-        : `Add a prior year to judge earnings quality (cash flow vs reported profit).`,
+        ? t(
+            `Earnings quality looks ${cf.cfo >= L.netIncome ? "solid — operating cash flow of " + eur(cf.cfo) + " covers reported net income, so profit is backed by cash" : "soft — operating cash flow of " + eur(cf.cfo) + " trails net income, a flag that profit is partly on paper (receivables build, capitalised costs)"}.`,
+            `Kvalitet zarade izgleda ${cf.cfo >= L.netIncome ? "solidno — operativni keš od " + eur(cf.cfo) + " pokriva neto dobit, pa je profit potkrepljen kešom" : "slabo — operativni keš od " + eur(cf.cfo) + " zaostaje za neto dobiti, znak da je profit delom papirnati (rast potraživanja, kapitalizovani troškovi)"}.`
+          )
+        : t(`Add a prior year to judge earnings quality (cash flow vs reported profit).`, `Dodaj prethodnu godinu da bi se procenio kvalitet zarade (keš tok vs prikazani profit).`),
     ],
   });
 
-  // 3. Leverage & funding — "is it taking on more debt, where does it borrow"
+  // 3. Leverage & funding
   const fundingPara = cf
     ? cf.changeDebt > 0.02 * L.revenue
-      ? `In the latest year it drew ${eur(cf.changeDebt)} of new debt — it is actively gearing up, funding growth/cash needs with borrowing rather than internal cash alone.`
+      ? t(`In the latest year it drew ${eur(cf.changeDebt)} of new debt — it is actively gearing up, funding growth/cash needs with borrowing rather than internal cash alone.`, `U poslednjoj godini povukla je ${eur(cf.changeDebt)} novog duga — aktivno se zadužuje, finansirajući rast/potrebe za kešom pozajmicama, ne samo internim kešom.`)
       : cf.changeDebt < -0.02 * L.revenue
-      ? `In the latest year it repaid ${eur(-cf.changeDebt)} of debt — it is deleveraging, using cash generation to pay down the balance sheet.`
-      : `Debt was broadly held flat in the latest year; the company is neither aggressively borrowing nor paying down.`
+      ? t(`In the latest year it repaid ${eur(-cf.changeDebt)} of debt — it is deleveraging, using cash generation to pay down the balance sheet.`, `U poslednjoj godini otplatila je ${eur(-cf.changeDebt)} duga — razdužuje se, koristeći generisani keš da smanji bilans.`)
+      : t(`Debt was broadly held flat in the latest year; the company is neither aggressively borrowing nor paying down.`, `Dug je u poslednjoj godini uglavnom ravan; firma se niti agresivno zadužuje niti otplaćuje.`)
     : "";
   sections.push({
     id: "leverage",
-    title: "Debt & how it funds itself",
+    title: t("Debt & how it funds itself", "Dug i kako se finansira"),
     tone: lev > 4 ? "warn" : "neutral",
     paragraphs: [
-      `Total debt ${debtChange > 0 ? "rose" : debtChange < 0 ? "fell" : "was flat"} ${multi ? `from ${eur(firstA.totalDebt)} to ${eur(L.totalDebt)}` : `at ${eur(L.totalDebt)}`}; net of ${eur(lastP.bs.cash)} cash, net debt is ${eur(L.netDebt)} — ${fmt(lev, "x")} EBITDA, which is ${levWord}. Interest cover is ${isFinite(coverage) ? fmt(coverage, "x") + (coverage > 4 ? " (comfortable)" : coverage > 2 ? " (adequate)" : " (tight — little headroom)") : "n/a (no interest cost)"}.`,
+      t(
+        `Total debt ${debtChange > 0 ? "rose" : debtChange < 0 ? "fell" : "was flat"} ${multi ? `from ${eur(firstA.totalDebt)} to ${eur(L.totalDebt)}` : `at ${eur(L.totalDebt)}`}; net of ${eur(lastP.bs.cash)} cash, net debt is ${eur(L.netDebt)} — ${fmt(lev, "x")} EBITDA, which is ${levWord}. Interest cover is ${isFinite(coverage) ? fmt(coverage, "x") + (coverage > 4 ? " (comfortable)" : coverage > 2 ? " (adequate)" : " (tight — little headroom)") : "n/a (no interest cost)"}.`,
+        `Ukupan dug je ${debtChange > 0 ? "porastao" : debtChange < 0 ? "pao" : "ostao ravan"} ${multi ? `sa ${eur(firstA.totalDebt)} na ${eur(L.totalDebt)}` : `na ${eur(L.totalDebt)}`}; umanjen za ${eur(lastP.bs.cash)} keša, neto dug je ${eur(L.netDebt)} — ${fmt(lev, "x")} EBITDA, što je ${levWord}. Pokriće kamate je ${isFinite(coverage) ? fmt(coverage, "x") + (coverage > 4 ? " (komotno)" : coverage > 2 ? " (zadovoljavajuće)" : " (tesno — malo prostora)") : "n/p (nema kamate)"}.`
+      ),
       fundingPara,
-      `Funding read: the business is financed primarily by ${L.totalEquity > L.totalDebt ? "equity" : "debt"}${cf && cf.cfo > cf.capex ? ", and it self-funds its investment from operating cash" : cf ? ", and operating cash does not fully cover investment — the gap is plugged by debt or equity" : ""}.`,
+      t(
+        `Funding read: the business is financed primarily by ${L.totalEquity > L.totalDebt ? "equity" : "debt"}${cf && cf.cfo > cf.capex ? ", and it self-funds its investment from operating cash" : cf ? ", and operating cash does not fully cover investment — the gap is plugged by debt or equity" : ""}.`,
+        `Finansiranje: posao se primarno finansira ${L.totalEquity > L.totalDebt ? "kapitalom" : "dugom"}${cf && cf.cfo > cf.capex ? ", i sam finansira investicije iz operativnog keša" : cf ? ", a operativni keš ne pokriva u potpunosti investicije — razlika se pokriva dugom ili kapitalom" : ""}.`
+      ),
     ],
   });
 
-  // 4. Cash deployment — "where does it place the money"
+  // 4. Cash deployment
   const deployBits: string[] = [];
   if (cf) {
     deployBits.push(
-      `Operating cash flow of ${eur(cf.cfo)} funded ${eur(cf.capex)} of capex (${fmt(capexInt, "% of revenue")} — ${capexInt > 8 ? "heavy reinvestment" : capexInt > 3 ? "moderate reinvestment" : "light reinvestment"}), leaving ${cf.fcf >= 0 ? "positive" : "negative"} free cash flow of ${eur(cf.fcf)} (${fmt(fcfMargin, "% of revenue")}).`
+      t(
+        `Operating cash flow of ${eur(cf.cfo)} funded ${eur(cf.capex)} of capex (${fmt(capexInt, "% of revenue")} — ${capexInt > 8 ? "heavy reinvestment" : capexInt > 3 ? "moderate reinvestment" : "light reinvestment"}), leaving ${cf.fcf >= 0 ? "positive" : "negative"} free cash flow of ${eur(cf.fcf)} (${fmt(fcfMargin, "% of revenue")}).`,
+        `Operativni keš od ${eur(cf.cfo)} finansirao je ${eur(cf.capex)} capex-a (${fmt(capexInt, "% prihoda")} — ${capexInt > 8 ? "teško reinvestiranje" : capexInt > 3 ? "umereno reinvestiranje" : "lako reinvestiranje"}), ostavljajući ${cf.fcf >= 0 ? "pozitivan" : "negativan"} slobodan keš od ${eur(cf.fcf)} (${fmt(fcfMargin, "% prihoda")}).`
+      )
     );
     if (cf.equityFlows < -0.01 * L.revenue)
-      deployBits.push(`It returned ${eur(-cf.equityFlows)} to shareholders (dividends / buybacks) — a sign of a mature, cash-generative profile.`);
+      deployBits.push(t(`It returned ${eur(-cf.equityFlows)} to shareholders (dividends / buybacks) — a sign of a mature, cash-generative profile.`, `Vratila je ${eur(-cf.equityFlows)} akcionarima (dividende / otkup akcija) — znak zrelog, keš-generišućeg profila.`));
     else if (cf.equityFlows > 0.01 * L.revenue)
-      deployBits.push(`It raised ${eur(cf.equityFlows)} of fresh equity — it is consuming external capital, typical of a growth or turnaround phase.`);
+      deployBits.push(t(`It raised ${eur(cf.equityFlows)} of fresh equity — it is consuming external capital, typical of a growth or turnaround phase.`, `Podigla je ${eur(cf.equityFlows)} svežeg kapitala — troši eksterni kapital, tipično za fazu rasta ili preokreta.`));
     const dOtherNCA = lastP.bs.otherNCA - prevP!.bs.otherNCA;
     if (dOtherNCA > 0.02 * L.revenue)
-      deployBits.push(`It also placed ${eur(dOtherNCA)} into other long-term / financial assets — parking cash outside the core operation.`);
+      deployBits.push(t(`It also placed ${eur(dOtherNCA)} into other long-term / financial assets — parking cash outside the core operation.`, `Takođe je plasirala ${eur(dOtherNCA)} u ostala dugoročna / finansijska sredstva — parkira keš van osnovne delatnosti.`));
     deployBits.push(
-      `Net, the cash is going mostly into ${cf.capex > Math.abs(cf.equityFlows) && cf.capex > Math.max(0, cf.changeDebt) ? "reinvestment in the asset base" : cf.changeDebt < 0 ? "paying down debt" : cf.equityFlows < 0 ? "shareholder returns" : "building cash / financial assets"}.`
+      t(
+        `Net, the cash is going mostly into ${cf.capex > Math.abs(cf.equityFlows) && cf.capex > Math.max(0, cf.changeDebt) ? "reinvestment in the asset base" : cf.changeDebt < 0 ? "paying down debt" : cf.equityFlows < 0 ? "shareholder returns" : "building cash / financial assets"}.`,
+        `Neto, keš ide uglavnom u ${cf.capex > Math.abs(cf.equityFlows) && cf.capex > Math.max(0, cf.changeDebt) ? "reinvestiranje u imovinu" : cf.changeDebt < 0 ? "otplatu duga" : cf.equityFlows < 0 ? "isplate akcionarima" : "gomilanje keša / finansijskih sredstava"}.`
+      )
     );
   } else {
-    deployBits.push("Add a second year so the cash flow (capex, debt paydown, dividends) can be derived.");
+    deployBits.push(t("Add a second year so the cash flow (capex, debt paydown, dividends) can be derived.", "Dodaj drugu godinu da bi se izveo keš tok (capex, otplata duga, dividende)."));
   }
-  sections.push({ id: "cash", title: "Where the money goes", tone: "neutral", paragraphs: deployBits });
+  sections.push({ id: "cash", title: t("Where the money goes", "Gde ide novac"), tone: "neutral", paragraphs: deployBits });
 
   // 5. Liquidity & working capital
   sections.push({
     id: "liquidity",
-    title: "Liquidity & working capital",
+    title: t("Liquidity & working capital", "Likvidnost i obrtni kapital"),
     tone: L.currentRatio < 1 ? "warn" : "neutral",
     paragraphs: [
-      `Current ratio of ${fmt(L.currentRatio, "x")} ${L.currentRatio >= 1.2 ? "comfortably covers" : L.currentRatio >= 1 ? "just covers" : "does NOT cover"} short-term obligations. The cash conversion cycle is ${fmt(L.cashConversionCycle, " days")} (DSO ${fmt(L.dso, "")} + DIO ${fmt(L.dio, "")} − DPO ${fmt(L.dpo, "")}) — ${L.cashConversionCycle < 0 ? "negative, so suppliers fund the operation (a structural cash advantage)" : L.cashConversionCycle > 90 ? "long, so growth ties up a lot of cash in receivables and inventory" : "moderate; the business is broadly self-funding on working capital"}.`,
+      t(
+        `Current ratio of ${fmt(L.currentRatio, "x")} ${L.currentRatio >= 1.2 ? "comfortably covers" : L.currentRatio >= 1 ? "just covers" : "does NOT cover"} short-term obligations. The cash conversion cycle is ${fmt(L.cashConversionCycle, " days")} (DSO ${fmt(L.dso, "")} + DIO ${fmt(L.dio, "")} − DPO ${fmt(L.dpo, "")}) — ${L.cashConversionCycle < 0 ? "negative, so suppliers fund the operation (a structural cash advantage)" : L.cashConversionCycle > 90 ? "long, so growth ties up a lot of cash in receivables and inventory" : "moderate; the business is broadly self-funding on working capital"}.`,
+        `Tekuća likvidnost od ${fmt(L.currentRatio, "x")} ${L.currentRatio >= 1.2 ? "komotno pokriva" : L.currentRatio >= 1 ? "taman pokriva" : "NE pokriva"} kratkoročne obaveze. Ciklus konverzije keša je ${fmt(L.cashConversionCycle, " dana")} (DSO ${fmt(L.dso, "")} + DIO ${fmt(L.dio, "")} − DPO ${fmt(L.dpo, "")}) — ${L.cashConversionCycle < 0 ? "negativan, pa dobavljači finansiraju posao (strukturna keš prednost)" : L.cashConversionCycle > 90 ? "dug, pa rast zaglavljuje mnogo keša u potraživanjima i zalihama" : "umeren; posao se uglavnom sam finansira na obrtnom kapitalu"}.`
+      ),
     ],
   });
 
   // 6. Returns
   sections.push({
     id: "returns",
-    title: "Returns on capital",
+    title: t("Returns on capital", "Prinosi na kapital"),
     tone: L.roe > 12 ? "pos" : L.roe < 0 ? "neg" : "neutral",
     paragraphs: [
-      `ROE is ${fmt(L.roe, "%")} and ROA ${fmt(L.roa, "%")}. ${L.roe > 15 ? "Returns are well above a typical cost of equity — the business compounds owner capital attractively." : L.roe > 8 ? "Returns roughly match the cost of capital — acceptable but not exceptional." : L.roe >= 0 ? "Returns are below a typical cost of capital — at these levels growth does not obviously create value." : "Returns are negative — the company is currently eroding owner capital."}`,
+      t(
+        `ROE is ${fmt(L.roe, "%")} and ROA ${fmt(L.roa, "%")}. ${L.roe > 15 ? "Returns are well above a typical cost of equity — the business compounds owner capital attractively." : L.roe > 8 ? "Returns roughly match the cost of capital — acceptable but not exceptional." : L.roe >= 0 ? "Returns are below a typical cost of capital — at these levels growth does not obviously create value." : "Returns are negative — the company is currently eroding owner capital."}`,
+        `ROE je ${fmt(L.roe, "%")} a ROA ${fmt(L.roa, "%")}. ${L.roe > 15 ? "Prinosi su znatno iznad tipične cene kapitala — posao atraktivno umnožava kapital vlasnika." : L.roe > 8 ? "Prinosi otprilike prate cenu kapitala — prihvatljivo ali ne izuzetno." : L.roe >= 0 ? "Prinosi su ispod tipične cene kapitala — na ovim nivoima rast očigledno ne stvara vrednost." : "Prinosi su negativni — firma trenutno nagriza kapital vlasnika."}`
+      ),
     ],
   });
 
@@ -839,18 +880,30 @@ export function buildAnalystReport(c: StatementCase): AnalystReport {
   const scenarios: AnalystScenario[] = [
     {
       name: "Bull",
-      tag: "growth holds, margins expand",
-      body: `Revenue keeps compounding near or above ${fmt(Math.max(g, 8), "%")} and ${marginWord === "expanding" ? "the margin tailwind continues" : "operating leverage finally kicks in"}. EBITDA could reach ~${eur(bullEbitda)} within three years. With ${lev < 2 ? "balance-sheet room to add leverage or do M&A" : "deleveraging from strong cash flow"}, equity value can re-rate sharply. Key unlock: ${L.grossMargin > 50 ? "scaling a high-margin model" : "pricing power and cost discipline"}.`,
+      label: t("Bull", "Optimistični"),
+      tag: t("growth holds, margins expand", "rast se drži, marže rastu"),
+      body: t(
+        `Revenue keeps compounding near or above ${fmt(Math.max(g, 8), "%")} and ${marginUp ? "the margin tailwind continues" : "operating leverage finally kicks in"}. EBITDA could reach ~${eur(bullEbitda)} within three years. With ${lev < 2 ? "balance-sheet room to add leverage or do M&A" : "deleveraging from strong cash flow"}, equity value can re-rate sharply. Key unlock: ${L.grossMargin > 50 ? "scaling a high-margin model" : "pricing power and cost discipline"}.`,
+        `Prihod nastavlja da raste blizu ili iznad ${fmt(Math.max(g, 8), "%")} i ${marginUp ? "marža nastavlja da se širi" : "operativni leveridž konačno proradi"}. EBITDA bi mogla da dostigne ~${eur(bullEbitda)} za tri godine. Uz ${lev < 2 ? "prostor u bilansu za dodatni dug ili M&A" : "razduživanje iz snažnog keša"}, vrednost kapitala može oštro da se re-rejtuje. Ključ: ${L.grossMargin > 50 ? "skaliranje visoko-maržnog modela" : "cenovna moć i disciplina troškova"}.`
+      ),
     },
     {
       name: "Base",
-      tag: "current trajectory continues",
-      body: `Holding the historical path — ${fmt(g, "%")} revenue growth, ${marginWord} margins, ${levWord} balance sheet — the company stays ${profitable ? "profitable and cash-generative" : "pre-profit but progressing"}, throwing off ${cf ? eur(cf.fcf) + " of free cash a year" : "modest free cash"}. A fair entry multiple sits in the middle of the sector range; returns come mostly from earnings growth, not re-rating.`,
+      label: t("Base", "Bazni"),
+      tag: t("current trajectory continues", "trenutna putanja se nastavlja"),
+      body: t(
+        `Holding the historical path — ${fmt(g, "%")} revenue growth, ${marginWord} margins, ${levWord} balance sheet — the company stays ${profitable ? "profitable and cash-generative" : "pre-profit but progressing"}, throwing off ${cf ? eur(cf.fcf) + " of free cash a year" : "modest free cash"}. A fair entry multiple sits in the middle of the sector range; returns come mostly from earnings growth, not re-rating.`,
+        `Držeći istorijsku putanju — ${fmt(g, "%")} rast prihoda, ${marginWord} marže, ${levWord} bilans — firma ostaje ${profitable ? "profitabilna i keš-generišuća" : "pre-profitna ali napreduje"}, donoseći ${cf ? eur(cf.fcf) + " slobodnog keša godišnje" : "skroman slobodan keš"}. Pošten ulazni multiplikator je u sredini sektorskog raspona; prinos dolazi uglavnom iz rasta zarade, ne iz re-rejtinga.`
+      ),
     },
     {
       name: "Bear",
-      tag: "growth stalls / downturn",
-      body: `If demand softens and ${ppeIntensity > 25 || L.cashConversionCycle > 90 ? "the fixed-cost / working-capital base" : "the cost base"} cannot flex, EBITDA could fall toward ~${eur(bearEbitda)}. ${lev > 3 ? `At ${fmt(lev, "x")} leverage this is the real risk — covenants tighten, interest eats cash, and equity gets squeezed first.` : "Low leverage cushions the downside, but multiples compress and growth investors leave."} ${L.currentRatio < 1 ? "Thin liquidity makes a cash crunch the live danger." : ""}`,
+      label: t("Bear", "Pesimistični"),
+      tag: t("growth stalls / downturn", "rast staje / pad"),
+      body: t(
+        `If demand softens and ${ppeIntensity > 25 || L.cashConversionCycle > 90 ? "the fixed-cost / working-capital base" : "the cost base"} cannot flex, EBITDA could fall toward ~${eur(bearEbitda)}. ${lev > 3 ? `At ${fmt(lev, "x")} leverage this is the real risk — covenants tighten, interest eats cash, and equity gets squeezed first.` : "Low leverage cushions the downside, but multiples compress and growth investors leave."} ${L.currentRatio < 1 ? "Thin liquidity makes a cash crunch the live danger." : ""}`,
+        `Ako potražnja oslabi i ${ppeIntensity > 25 || L.cashConversionCycle > 90 ? "baza fiksnih troškova / obrtnog kapitala" : "baza troškova"} ne može da se prilagodi, EBITDA bi mogla da padne ka ~${eur(bearEbitda)}. ${lev > 3 ? `Pri ${fmt(lev, "x")} zaduženosti ovo je pravi rizik — kovenanti se stežu, kamata jede keš, a kapital prvi strada.` : "Niska zaduženost ublažava pad, ali multiplikatori se skupljaju i investitori rasta odlaze."} ${L.currentRatio < 1 ? "Tanka likvidnost čini keš-krizu živom opasnošću." : ""}`
+      ),
     },
   ];
 
@@ -861,23 +914,38 @@ export function buildAnalystReport(c: StatementCase): AnalystReport {
   if (lev < 2) score += 1; else if (lev > 4) score -= 2;
   if (!profitable) score -= 1;
   if (L.roe > 15) score += 1;
-  const verdict = score >= 3 ? "Buy" : score <= 0 ? "Pass" : "Conditional — buy at the right price";
+  const verdictKind = score >= 3 ? "buy" : score <= 0 ? "pass" : "cond";
+  const verdict =
+    verdictKind === "buy"
+      ? t("Buy", "Kupi")
+      : verdictKind === "pass"
+      ? t("Pass", "Prođi")
+      : t("Conditional — buy at the right price", "Uslovno — kupi po pravoj ceni");
 
   let investorType: string;
-  if (!profitable && g > 15) investorType = "Venture / growth equity (high risk, betting on the curve)";
-  else if (g > 15 && lev < 2) investorType = "Growth equity — scale a winning, under-levered model";
-  else if (profitable && lev < 3 && cf && cf.fcf > 0 && g < 12) investorType = "Private equity / LBO — stable cash flow supports leverage and a buyout";
-  else if (cf && cf.equityFlows < 0 && g < 6) investorType = "Income / dividend investor — mature cash machine";
-  else if (lev > 5 || coverage < 1.5 || !profitable) investorType = "Special situations / distressed — only for restructuring specialists";
-  else investorType = "Value investor — buy cheap, hold for cash generation";
+  if (!profitable && g > 15) investorType = t("Venture / growth equity (high risk, betting on the curve)", "Venture / growth equity (visok rizik, opklada na krivu)");
+  else if (g > 15 && lev < 2) investorType = t("Growth equity — scale a winning, under-levered model", "Growth equity — skaliranje pobedničkog, malo zaduženog modela");
+  else if (profitable && lev < 3 && cf && cf.fcf > 0 && g < 12) investorType = t("Private equity / LBO — stable cash flow supports leverage and a buyout", "Private equity / LBO — stabilan keš podržava leveridž i otkup");
+  else if (cf && cf.equityFlows < 0 && g < 6) investorType = t("Income / dividend investor — mature cash machine", "Income / dividendni investitor — zrela keš mašina");
+  else if (lev > 5 || coverage < 1.5 || !profitable) investorType = t("Special situations / distressed — only for restructuring specialists", "Special situations / distressed — samo za specijaliste za restrukturiranje");
+  else investorType = t("Value investor — buy cheap, hold for cash generation", "Value investor — kupi jeftino, drži zbog keša");
 
   const entryLow = g > 8 ? 8 : g > 0 ? 6 : 4;
   const entryHigh = g > 8 ? 12 : g > 0 ? 9 : 6;
-  const sizing = `Defensible entry: ~${entryLow}–${entryHigh}x EV/EBITDA → enterprise value ≈ ${eur(L.ebitda * entryLow)}–${eur(L.ebitda * entryHigh)}. Net debt of ${eur(L.netDebt)} bridges EV down to the equity cheque. Every 1.0x of multiple is ${eur(L.ebitda)} of value, so disciplined entry matters more than almost anything else.`;
+  const sizing = t(
+    `Defensible entry: ~${entryLow}–${entryHigh}x EV/EBITDA → enterprise value ≈ ${eur(L.ebitda * entryLow)}–${eur(L.ebitda * entryHigh)}. Net debt of ${eur(L.netDebt)} bridges EV down to the equity cheque. Every 1.0x of multiple is ${eur(L.ebitda)} of value, so disciplined entry matters more than almost anything else.`,
+    `Branljiv ulaz: ~${entryLow}–${entryHigh}x EV/EBITDA → enterprise value ≈ ${eur(L.ebitda * entryLow)}–${eur(L.ebitda * entryHigh)}. Neto dug od ${eur(L.netDebt)} spušta EV do equity čeka. Svakih 1.0x multiplikatora je ${eur(L.ebitda)} vrednosti, pa disciplinovan ulaz znači više od skoro svega ostalog.`
+  );
 
-  const recBody = `Net of growth (${fmt(g, "%")}), margin trend (${marginWord}), leverage (${fmt(lev, "x")}) and returns (ROE ${fmt(L.roe, "%")}), the signals point to: ${verdict}. ${verdict.startsWith("Buy") ? "The fundamentals support an investment provided entry is disciplined." : verdict.startsWith("Pass") ? "Better to wait — the risk/reward does not favour the buyer here." : "It can work, but only if you buy below the mid-range and the base case holds."} What breaks the thesis: ${lev > 3 ? "a demand shock against high leverage" : marginWord === "compressing" ? "continued margin erosion" : "growth stalling without margin offset"}.`;
+  const recBody = t(
+    `Net of growth (${fmt(g, "%")}), margin trend (${marginWord}), leverage (${fmt(lev, "x")}) and returns (ROE ${fmt(L.roe, "%")}), the signals point to: ${verdict}. ${verdictKind === "buy" ? "The fundamentals support an investment provided entry is disciplined." : verdictKind === "pass" ? "Better to wait — the risk/reward does not favour the buyer here." : "It can work, but only if you buy below the mid-range and the base case holds."} What breaks the thesis: ${lev > 3 ? "a demand shock against high leverage" : marginDown ? "continued margin erosion" : "growth stalling without margin offset"}.`,
+    `Sve u svemu — rast (${fmt(g, "%")}), trend marže (${marginWord}), zaduženost (${fmt(lev, "x")}) i prinosi (ROE ${fmt(L.roe, "%")}) — signali vode ka: ${verdict}. ${verdictKind === "buy" ? "Fundamenti podržavaju ulaganje uz disciplinovan ulaz." : verdictKind === "pass" ? "Bolje sačekati — odnos rizik/prinos ovde ne ide u korist kupca." : "Može da uspe, ali samo ako kupiš ispod sredine raspona i bazni scenario se održi."} Šta lomi tezu: ${lev > 3 ? "šok potražnje uz visoku zaduženost" : marginDown ? "nastavak erozije marže" : "zastoj rasta bez kompenzacije u marži"}.`
+  );
 
-  const headline = `${c.name || "This company"} — ${profitable ? "profitable" : "loss-making"}, ${growthWord} revenue (${fmt(g, "%")} CAGR), ${levWord} (${fmt(lev, "x")} net debt/EBITDA). Read: ${verdict}.`;
+  const headline = t(
+    `${c.name || "This company"} — ${profitable ? "profitable" : "loss-making"}, ${growthWord} revenue (${fmt(g, "%")} CAGR), ${levWord} (${fmt(lev, "x")} net debt/EBITDA). Read: ${verdict}.`,
+    `${c.name || "Ova firma"} — ${profitable ? "profitabilna" : "posluje sa gubitkom"}, ${growthWord} prihod (${fmt(g, "%")} CAGR), ${levWord} (${fmt(lev, "x")} neto dug/EBITDA). Ocena: ${verdict}.`
+  );
 
   return {
     ready: true,

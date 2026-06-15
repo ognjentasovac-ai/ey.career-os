@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, EmptyState } from "../ui";
-import { buildAnalystReport } from "@/lib/statements";
+import { buildAnalystReport, type AnalystLang } from "@/lib/statements";
 import type { StatementCase } from "@/lib/types";
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Building2 } from "lucide-react";
 
@@ -25,23 +26,49 @@ const scenarioStyle: Record<string, { border: string; label: string }> = {
 };
 
 export default function AnalystView({ c }: { c: StatementCase }) {
-  const report = buildAnalystReport(c);
+  const [lang, setLang] = useState<AnalystLang>("sr");
+  const report = buildAnalystReport(c, lang);
+  const t = (en: string, sr: string) => (lang === "sr" ? sr : en);
 
   if (!report.ready)
-    return <EmptyState message="Enter the P&L and balance sheet first — the analyst write-up is generated from the numbers." />;
+    return (
+      <EmptyState
+        message={t(
+          "Enter the P&L and balance sheet first — the analyst write-up is generated from the numbers.",
+          "Prvo unesi bilans uspeha i bilans stanja — analiza se generiše iz brojeva."
+        )}
+      />
+    );
 
   return (
     <div className="space-y-4">
-      {/* Headline */}
+      {/* Headline + language toggle */}
       <Card className="panel-grad border-accent/30">
-        <CardContent className="space-y-1 p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">
-            Analyst write-up
-          </p>
+        <CardContent className="space-y-2 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">
+              {t("Analyst write-up", "Analiza analitičara")}
+            </p>
+            <div className="flex shrink-0 overflow-hidden rounded-md border border-border">
+              {(["sr", "en"] as AnalystLang[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`px-2.5 py-1 text-[11px] font-medium uppercase transition-colors ${
+                    lang === l ? "bg-accent/20 text-accent" : "text-muted-foreground hover:bg-elevated"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="text-sm leading-relaxed text-foreground">{report.headline}</p>
-          <p className="pt-1 text-[11px] text-muted-foreground">
-            Auto-generated from this company&apos;s statements — updates live as you edit the data. The
-            way a professional analyst would read it.
+          <p className="text-[11px] text-muted-foreground">
+            {t(
+              "Auto-generated from this company's statements — updates live as you edit the data. The way a professional analyst would read it.",
+              "Automatski iz izveštaja ove firme — menja se uživo kako menjaš podatke. Kako bi je pročitao profesionalni analitičar."
+            )}
           </p>
         </CardContent>
       </Card>
@@ -69,7 +96,8 @@ export default function AnalystView({ c }: { c: StatementCase }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-            <Building2 size={16} className="text-accent" /> What could happen — scenarios
+            <Building2 size={16} className="text-accent" />{" "}
+            {t("What could happen — scenarios", "Šta može da se desi — scenariji")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 pt-0 md:grid-cols-3">
@@ -78,7 +106,7 @@ export default function AnalystView({ c }: { c: StatementCase }) {
             return (
               <div key={sc.name} className={`rounded-md border p-3 ${st.border}`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide ${st.label}`}>
-                  {sc.name}
+                  {sc.label}
                 </p>
                 <p className="mb-1 text-[11px] italic text-muted-foreground">{sc.tag}</p>
                 <p className="text-[12px] leading-relaxed text-foreground">{sc.body}</p>
@@ -92,27 +120,27 @@ export default function AnalystView({ c }: { c: StatementCase }) {
       <Card className="border-gold/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gold">
-            <Target size={16} /> Investment call
+            <Target size={16} /> {t("Investment call", "Investiciona preporuka")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border border-border bg-elevated p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Verdict
+                {t("Verdict", "Ocena")}
               </p>
               <p className="text-sm font-semibold text-gold">{report.recommendation.verdict}</p>
             </div>
             <div className="rounded-md border border-border bg-elevated p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Who should own it
+                {t("Who should own it", "Ko treba da je kupi")}
               </p>
               <p className="text-[13px] text-foreground">{report.recommendation.investorType}</p>
             </div>
           </div>
           <div className="rounded-md border border-border bg-elevated p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              How much to pay
+              {t("How much to pay", "Koliko platiti")}
             </p>
             <p className="text-[12px] leading-relaxed text-foreground">{report.recommendation.sizing}</p>
           </div>
@@ -123,7 +151,10 @@ export default function AnalystView({ c }: { c: StatementCase }) {
       </Card>
 
       <p className="px-1 pb-2 text-center text-[11px] text-muted-foreground">
-        Educational, data-derived commentary — not investment advice.
+        {t(
+          "Educational, data-derived commentary — not investment advice.",
+          "Edukativni komentar izveden iz podataka — nije investicioni savet."
+        )}
       </p>
     </div>
   );
