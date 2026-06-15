@@ -11,6 +11,7 @@ import {
   Eye,
   Check,
   BookOpen,
+  FileText,
   Layers3,
   CalendarPlus,
   Flame,
@@ -63,6 +64,7 @@ import {
 } from "../ui";
 import { KpiCard } from "../shared";
 import CasePlaybook from "./CasePlaybook";
+import AnalystView from "./AnalystView";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -529,7 +531,7 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* --------------------------- Case detail ------------------------------- */
-type View = "reports" | "edit" | "seasonality" | "analysis" | "quiz" | "playbook";
+type View = "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook";
 
 function CaseDetail({
   c,
@@ -576,6 +578,7 @@ function CaseDetail({
 
   const tabs: { key: View; label: string; icon: React.ReactNode }[] = [
     { key: "reports", label: "Reports", icon: <Layers3 size={14} /> },
+    { key: "analyst", label: "Analyst View", icon: <FileText size={14} /> },
     { key: "seasonality", label: "Seasonality", icon: <CalendarPlus size={14} /> },
     { key: "analysis", label: "Analysis", icon: <LineIcon size={14} /> },
     { key: "edit", label: "Edit data", icon: <Calculator size={14} /> },
@@ -643,6 +646,7 @@ function CaseDetail({
         />
       )}
       {view === "quiz" && <QuizView c={c} onChange={onChange} />}
+      {view === "analyst" && <AnalystView c={c} />}
       {view === "playbook" && <CasePlaybook />}
     </div>
   );

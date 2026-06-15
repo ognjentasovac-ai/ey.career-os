@@ -678,6 +678,216 @@ export function computeCashFlow(
   };
 }
 
+/* ------------------ Analyst write-up (per company) --------------------- */
+export interface AnalystSection {
+  id: string;
+  title: string;
+  paragraphs: string[];
+  tone: "pos" | "neg" | "warn" | "neutral";
+}
+export interface AnalystScenario {
+  name: string; // Bull / Base / Bear
+  tag: string;
+  body: string;
+}
+export interface AnalystReport {
+  ready: boolean;
+  headline: string;
+  sections: AnalystSection[];
+  scenarios: AnalystScenario[];
+  recommendation: {
+    verdict: string;
+    investorType: string;
+    sizing: string;
+    body: string;
+  };
+}
+
+/** Generates a professional, scenario-aware narrative analysis from the numbers. */
+export function buildAnalystReport(c: StatementCase): AnalystReport {
+  const empty: AnalystReport = {
+    ready: false,
+    headline: "",
+    sections: [],
+    scenarios: [],
+    recommendation: { verdict: "", investorType: "", sizing: "", body: "" },
+  };
+
+  const sorted = [...c.periods]
+    .filter((p) => !p.projected)
+    .sort((x, y) => yearOf(x.label) - yearOf(y.label));
+  if (!sorted.length || !sorted.some((p) => p.pl.revenue)) return empty;
+
+  const a = analyseCase(c);
+  const L = a.latest;
+  if (!L) return empty;
+
+  const firstP = sorted[0];
+  const lastP = sorted[sorted.length - 1];
+  const firstA = analysePeriod(firstP);
+  const multi = sorted.length > 1;
+  const prevP = multi ? sorted[sorted.length - 2] : null;
+  const cf = prevP ? computeCashFlow(prevP, lastP) : null;
+
+  const g = a.revenueCagr;
+  const profitable = L.netIncome > 0;
+  const interest = lastP.pl.interest || 0;
+  const coverage = interest > 0 ? L.ebit / interest : Infinity;
+  const capexInt = cf ? safeDiv(cf.capex, L.revenue) * 100 : 0;
+  const fcfMargin = cf ? safeDiv(cf.fcf, L.revenue) * 100 : 0;
+  const debtChange = L.totalDebt - firstA.totalDebt;
+  const lev = L.netDebtToEbitda;
+  const ppeIntensity = safeDiv(lastP.bs.ppe, L.revenue) * 100;
+
+  const growthWord = g > 12 ? "strong" : g > 4 ? "moderate" : g > -1 ? "broadly flat" : "declining";
+  const levWord = lev > 4 ? "highly levered" : lev > 2 ? "moderately levered" : "lightly levered / net-cash";
+  const marginWord = a.marginDelta > 0.5 ? "expanding" : a.marginDelta < -0.5 ? "compressing" : "stable";
+
+  // ---- Sections ----------------------------------------------------------
+  const sections: AnalystSection[] = [];
+
+  // 1. Business read
+  const assetWord = ppeIntensity > 40 ? "capital-heavy" : ppeIntensity > 15 ? "moderately capital-intensive" : "capital-light";
+  const marginNature =
+    L.grossMargin > 70 ? "software / services economics" : L.grossMargin > 40 ? "branded / value-added economics" : "distribution / retail economics";
+  sections.push({
+    id: "business",
+    title: "What this business looks like",
+    tone: "neutral",
+    paragraphs: [
+      `On its financial fingerprint this reads as a ${assetWord} business with ${marginNature}. Gross margin sits at ${fmt(L.grossMargin, "%")}, inventory turns in ${fmt(L.dio, " days")}, and PP&E is ${fmt(ppeIntensity, "% of revenue")} — together that points to ${assetWord === "capital-light" ? "an asset-light model where people/IP, not plant, drive output" : "a model where fixed assets and reinvestment matter to the story"}.`,
+      `Revenue of ${eur(L.revenue)} is ${growthWord} (${fmt(g, "%")} CAGR over the period). The mix and seasonality decide how durable that top line is — recurring, diversified revenue is worth far more than one-off or concentrated revenue.`,
+    ],
+  });
+
+  // 2. Profitability
+  sections.push({
+    id: "profit",
+    title: profitable ? "Yes — it is profitable" : "Not yet profitable",
+    tone: profitable ? "pos" : "neg",
+    paragraphs: [
+      `The company converts ${eur(L.revenue)} of revenue into ${eur(L.ebitda)} of EBITDA (${fmt(L.ebitdaMargin, "%")} margin) and ${eur(L.netIncome)} of net income (${fmt(L.netMargin, "%")} net margin). Margins are ${marginWord}${multi ? ` — ${a.marginDelta >= 0 ? "+" : ""}${fmt(a.marginDelta, " ppt")} versus the first year` : ""}.`,
+      cf
+        ? `Earnings quality looks ${cf.cfo >= L.netIncome ? "solid — operating cash flow of " + eur(cf.cfo) + " covers reported net income, so profit is backed by cash" : "soft — operating cash flow of " + eur(cf.cfo) + " trails net income, a flag that profit is partly on paper (receivables build, capitalised costs)"}.`
+        : `Add a prior year to judge earnings quality (cash flow vs reported profit).`,
+    ],
+  });
+
+  // 3. Leverage & funding — "is it taking on more debt, where does it borrow"
+  const fundingPara = cf
+    ? cf.changeDebt > 0.02 * L.revenue
+      ? `In the latest year it drew ${eur(cf.changeDebt)} of new debt — it is actively gearing up, funding growth/cash needs with borrowing rather than internal cash alone.`
+      : cf.changeDebt < -0.02 * L.revenue
+      ? `In the latest year it repaid ${eur(-cf.changeDebt)} of debt — it is deleveraging, using cash generation to pay down the balance sheet.`
+      : `Debt was broadly held flat in the latest year; the company is neither aggressively borrowing nor paying down.`
+    : "";
+  sections.push({
+    id: "leverage",
+    title: "Debt & how it funds itself",
+    tone: lev > 4 ? "warn" : "neutral",
+    paragraphs: [
+      `Total debt ${debtChange > 0 ? "rose" : debtChange < 0 ? "fell" : "was flat"} ${multi ? `from ${eur(firstA.totalDebt)} to ${eur(L.totalDebt)}` : `at ${eur(L.totalDebt)}`}; net of ${eur(lastP.bs.cash)} cash, net debt is ${eur(L.netDebt)} — ${fmt(lev, "x")} EBITDA, which is ${levWord}. Interest cover is ${isFinite(coverage) ? fmt(coverage, "x") + (coverage > 4 ? " (comfortable)" : coverage > 2 ? " (adequate)" : " (tight — little headroom)") : "n/a (no interest cost)"}.`,
+      fundingPara,
+      `Funding read: the business is financed primarily by ${L.totalEquity > L.totalDebt ? "equity" : "debt"}${cf && cf.cfo > cf.capex ? ", and it self-funds its investment from operating cash" : cf ? ", and operating cash does not fully cover investment — the gap is plugged by debt or equity" : ""}.`,
+    ],
+  });
+
+  // 4. Cash deployment — "where does it place the money"
+  const deployBits: string[] = [];
+  if (cf) {
+    deployBits.push(
+      `Operating cash flow of ${eur(cf.cfo)} funded ${eur(cf.capex)} of capex (${fmt(capexInt, "% of revenue")} — ${capexInt > 8 ? "heavy reinvestment" : capexInt > 3 ? "moderate reinvestment" : "light reinvestment"}), leaving ${cf.fcf >= 0 ? "positive" : "negative"} free cash flow of ${eur(cf.fcf)} (${fmt(fcfMargin, "% of revenue")}).`
+    );
+    if (cf.equityFlows < -0.01 * L.revenue)
+      deployBits.push(`It returned ${eur(-cf.equityFlows)} to shareholders (dividends / buybacks) — a sign of a mature, cash-generative profile.`);
+    else if (cf.equityFlows > 0.01 * L.revenue)
+      deployBits.push(`It raised ${eur(cf.equityFlows)} of fresh equity — it is consuming external capital, typical of a growth or turnaround phase.`);
+    const dOtherNCA = lastP.bs.otherNCA - prevP!.bs.otherNCA;
+    if (dOtherNCA > 0.02 * L.revenue)
+      deployBits.push(`It also placed ${eur(dOtherNCA)} into other long-term / financial assets — parking cash outside the core operation.`);
+    deployBits.push(
+      `Net, the cash is going mostly into ${cf.capex > Math.abs(cf.equityFlows) && cf.capex > Math.max(0, cf.changeDebt) ? "reinvestment in the asset base" : cf.changeDebt < 0 ? "paying down debt" : cf.equityFlows < 0 ? "shareholder returns" : "building cash / financial assets"}.`
+    );
+  } else {
+    deployBits.push("Add a second year so the cash flow (capex, debt paydown, dividends) can be derived.");
+  }
+  sections.push({ id: "cash", title: "Where the money goes", tone: "neutral", paragraphs: deployBits });
+
+  // 5. Liquidity & working capital
+  sections.push({
+    id: "liquidity",
+    title: "Liquidity & working capital",
+    tone: L.currentRatio < 1 ? "warn" : "neutral",
+    paragraphs: [
+      `Current ratio of ${fmt(L.currentRatio, "x")} ${L.currentRatio >= 1.2 ? "comfortably covers" : L.currentRatio >= 1 ? "just covers" : "does NOT cover"} short-term obligations. The cash conversion cycle is ${fmt(L.cashConversionCycle, " days")} (DSO ${fmt(L.dso, "")} + DIO ${fmt(L.dio, "")} − DPO ${fmt(L.dpo, "")}) — ${L.cashConversionCycle < 0 ? "negative, so suppliers fund the operation (a structural cash advantage)" : L.cashConversionCycle > 90 ? "long, so growth ties up a lot of cash in receivables and inventory" : "moderate; the business is broadly self-funding on working capital"}.`,
+    ],
+  });
+
+  // 6. Returns
+  sections.push({
+    id: "returns",
+    title: "Returns on capital",
+    tone: L.roe > 12 ? "pos" : L.roe < 0 ? "neg" : "neutral",
+    paragraphs: [
+      `ROE is ${fmt(L.roe, "%")} and ROA ${fmt(L.roa, "%")}. ${L.roe > 15 ? "Returns are well above a typical cost of equity — the business compounds owner capital attractively." : L.roe > 8 ? "Returns roughly match the cost of capital — acceptable but not exceptional." : L.roe >= 0 ? "Returns are below a typical cost of capital — at these levels growth does not obviously create value." : "Returns are negative — the company is currently eroding owner capital."}`,
+    ],
+  });
+
+  // ---- Scenarios ---------------------------------------------------------
+  const bullEbitda = L.ebitda * Math.pow(1 + Math.max(0.05, g / 100) + 0.02, 3);
+  const bearEbitda = L.ebitda * Math.pow(1 + Math.min(0, g / 100) - 0.05, 3);
+  const scenarios: AnalystScenario[] = [
+    {
+      name: "Bull",
+      tag: "growth holds, margins expand",
+      body: `Revenue keeps compounding near or above ${fmt(Math.max(g, 8), "%")} and ${marginWord === "expanding" ? "the margin tailwind continues" : "operating leverage finally kicks in"}. EBITDA could reach ~${eur(bullEbitda)} within three years. With ${lev < 2 ? "balance-sheet room to add leverage or do M&A" : "deleveraging from strong cash flow"}, equity value can re-rate sharply. Key unlock: ${L.grossMargin > 50 ? "scaling a high-margin model" : "pricing power and cost discipline"}.`,
+    },
+    {
+      name: "Base",
+      tag: "current trajectory continues",
+      body: `Holding the historical path — ${fmt(g, "%")} revenue growth, ${marginWord} margins, ${levWord} balance sheet — the company stays ${profitable ? "profitable and cash-generative" : "pre-profit but progressing"}, throwing off ${cf ? eur(cf.fcf) + " of free cash a year" : "modest free cash"}. A fair entry multiple sits in the middle of the sector range; returns come mostly from earnings growth, not re-rating.`,
+    },
+    {
+      name: "Bear",
+      tag: "growth stalls / downturn",
+      body: `If demand softens and ${ppeIntensity > 25 || L.cashConversionCycle > 90 ? "the fixed-cost / working-capital base" : "the cost base"} cannot flex, EBITDA could fall toward ~${eur(bearEbitda)}. ${lev > 3 ? `At ${fmt(lev, "x")} leverage this is the real risk — covenants tighten, interest eats cash, and equity gets squeezed first.` : "Low leverage cushions the downside, but multiples compress and growth investors leave."} ${L.currentRatio < 1 ? "Thin liquidity makes a cash crunch the live danger." : ""}`,
+    },
+  ];
+
+  // ---- Recommendation ----------------------------------------------------
+  let score = 0;
+  if (g > 8) score += 2; else if (g > 0) score += 1; else score -= 1;
+  if (a.marginDelta > 0) score += 1; else if (a.marginDelta < -1) score -= 1;
+  if (lev < 2) score += 1; else if (lev > 4) score -= 2;
+  if (!profitable) score -= 1;
+  if (L.roe > 15) score += 1;
+  const verdict = score >= 3 ? "Buy" : score <= 0 ? "Pass" : "Conditional — buy at the right price";
+
+  let investorType: string;
+  if (!profitable && g > 15) investorType = "Venture / growth equity (high risk, betting on the curve)";
+  else if (g > 15 && lev < 2) investorType = "Growth equity — scale a winning, under-levered model";
+  else if (profitable && lev < 3 && cf && cf.fcf > 0 && g < 12) investorType = "Private equity / LBO — stable cash flow supports leverage and a buyout";
+  else if (cf && cf.equityFlows < 0 && g < 6) investorType = "Income / dividend investor — mature cash machine";
+  else if (lev > 5 || coverage < 1.5 || !profitable) investorType = "Special situations / distressed — only for restructuring specialists";
+  else investorType = "Value investor — buy cheap, hold for cash generation";
+
+  const entryLow = g > 8 ? 8 : g > 0 ? 6 : 4;
+  const entryHigh = g > 8 ? 12 : g > 0 ? 9 : 6;
+  const sizing = `Defensible entry: ~${entryLow}–${entryHigh}x EV/EBITDA → enterprise value ≈ ${eur(L.ebitda * entryLow)}–${eur(L.ebitda * entryHigh)}. Net debt of ${eur(L.netDebt)} bridges EV down to the equity cheque. Every 1.0x of multiple is ${eur(L.ebitda)} of value, so disciplined entry matters more than almost anything else.`;
+
+  const recBody = `Net of growth (${fmt(g, "%")}), margin trend (${marginWord}), leverage (${fmt(lev, "x")}) and returns (ROE ${fmt(L.roe, "%")}), the signals point to: ${verdict}. ${verdict.startsWith("Buy") ? "The fundamentals support an investment provided entry is disciplined." : verdict.startsWith("Pass") ? "Better to wait — the risk/reward does not favour the buyer here." : "It can work, but only if you buy below the mid-range and the base case holds."} What breaks the thesis: ${lev > 3 ? "a demand shock against high leverage" : marginWord === "compressing" ? "continued margin erosion" : "growth stalling without margin offset"}.`;
+
+  const headline = `${c.name || "This company"} — ${profitable ? "profitable" : "loss-making"}, ${growthWord} revenue (${fmt(g, "%")} CAGR), ${levWord} (${fmt(lev, "x")} net debt/EBITDA). Read: ${verdict}.`;
+
+  return {
+    ready: true,
+    headline,
+    sections,
+    scenarios,
+    recommendation: { verdict, investorType, sizing, body: recBody },
+  };
+}
+
 /* ------------------------------ Quiz ----------------------------------- */
 export type QuizGradeKind = "buy" | "direction" | "sector" | "open";
 

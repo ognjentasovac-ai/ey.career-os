@@ -66,6 +66,22 @@ export default function CasePlaybook() {
   function setAll(v: boolean) {
     setOpen(Object.fromEntries(sections.map((s) => [s.id, v])));
   }
+  function jump(id: string) {
+    setOpen((o) => ({ ...o, [id]: true }));
+    document.getElementById(`pb-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // The order you actually work a case, top priorities flagged.
+  const flow: { n: number; label: string; target: string; star?: boolean }[] = [
+    { n: 1, label: "Read the business — what is it & how it earns", target: "sectors" },
+    { n: 2, label: "Profitability — margins & whether they're real", target: "margins" },
+    { n: 3, label: "Cash — working capital & FCF conversion", target: "wc" },
+    { n: 4, label: "Survival — leverage & coverage", target: "leverage" },
+    { n: 5, label: "Normalize EBITDA (quality of earnings)", target: "qoe", star: true },
+    { n: 6, label: "Red flags — what could kill the deal", target: "flags" },
+    { n: 7, label: "Valuation — what you'd pay & entry discipline", target: "valuation", star: true },
+    { n: 8, label: "Verdict — Buy / Pass, price, what breaks it", target: "plan" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -92,15 +108,54 @@ export default function CasePlaybook() {
             {sections.map((s) => (
               <button
                 key={s.id}
-                onClick={() => {
-                  setOpen((o) => ({ ...o, [s.id]: true }));
-                  document.getElementById(`pb-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
+                onClick={() => jump(s.id)}
                 className="rounded-full border border-border bg-panel px-2.5 py-1 text-[11px] text-muted-foreground hover:border-accent/50 hover:text-accent"
               >
                 {s.title}
               </button>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* The sequence — how to attack a case, in order */}
+      <Card className="border-accent/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+            <Target size={16} className="text-accent" /> The sequence — work it in this order
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 pt-0">
+          <ol className="space-y-1.5">
+            {flow.map((f) => (
+              <li key={f.n}>
+                <button
+                  onClick={() => jump(f.target)}
+                  className="flex w-full items-center gap-2.5 rounded-md border border-border bg-elevated px-3 py-2 text-left text-xs transition-colors hover:border-accent/50"
+                >
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                      f.star ? "bg-gold/20 text-gold" : "bg-accent/15 text-accent"
+                    }`}
+                  >
+                    {f.n}
+                  </span>
+                  <span className="text-foreground">{f.label}</span>
+                  {f.star && (
+                    <span className="ml-auto shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                      ★ most weight
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="rounded-md border border-gold/40 bg-gold/5 p-3 text-[12px] leading-relaxed text-foreground">
+            <span className="font-semibold text-gold">Where the marks are won: </span>
+            steps <b>5</b> and <b>7</b>. Everyone can recite ratios — the edge is{" "}
+            <b>normalizing EBITDA</b> (the clean number a buyer actually pays a multiple on) and{" "}
+            <b>entry-price discipline</b> (you make your return on the buy, not the exit). Always end
+            on a clear <b>Buy / Pass</b> with a number.
           </div>
         </CardContent>
       </Card>

@@ -20,3 +20,4 @@ dev.log
 /.open-next
 cf_build.log
 .wrangler
+cf_deploy.log
