@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
+  Home as HomeIcon,
   LayoutDashboard,
   GitBranch,
   Network,
@@ -30,6 +31,7 @@ import { SCENARIOS, currentPosition, computeMetrics } from "@/lib/calculations";
 import { cn } from "@/lib/utils";
 import { Button, Modal, Input, Field } from "./ui";
 
+import { Home } from "./modules/Home";
 import { Dashboard } from "./modules/Dashboard";
 import { Timeline } from "./modules/Timeline";
 import { SkillTree } from "./modules/SkillTree";
@@ -44,6 +46,7 @@ import { Statements } from "./modules/Statements";
 import { Training } from "./modules/Training";
 
 type TabKey =
+  | "home"
   | "dashboard"
   | "timeline"
   | "skills"
@@ -63,6 +66,7 @@ const NAV: {
   icon: React.ReactNode;
   group: string;
 }[] = [
+  { key: "home", label: "Home", icon: <HomeIcon size={16} />, group: "Overview" },
   { key: "dashboard", label: "Executive Dashboard", icon: <LayoutDashboard size={16} />, group: "Overview" },
   { key: "timeline", label: "Career Timeline", icon: <GitBranch size={16} />, group: "Overview" },
   { key: "statements", label: "3-Statement Lab", icon: <Layers3 size={16} />, group: "Training" },
@@ -81,7 +85,7 @@ const GROUPS = ["Overview", "Training", "Development", "Strategy"];
 
 export function Shell() {
   const { state, hydrated, reset, exportJSON, importJSON } = useStore();
-  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [tab, setTab] = useState<TabKey>("home");
   const [mobileOpen, setMobileOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -121,6 +125,7 @@ export function Shell() {
 
   const content = (
     <>
+      {tab === "home" && <Home onLaunch={(k) => setTab(k as TabKey)} />}
       {tab === "dashboard" && <Dashboard />}
       {tab === "timeline" && <Timeline />}
       {tab === "statements" && <Statements />}
