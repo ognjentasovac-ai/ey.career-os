@@ -206,11 +206,11 @@ export function Shell() {
                     className={cn(
                       "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-all",
                       tab === n.key
-                        ? "bg-accent/15 font-medium text-accent shadow-[inset_2px_0_0_0_hsl(var(--accent))]"
+                        ? "bg-gold/15 font-medium text-gold shadow-[inset_2px_0_0_0_hsl(var(--gold))]"
                         : "text-muted-foreground hover:bg-elevated hover:text-foreground"
                     )}
                   >
-                    <span className={tab === n.key ? "text-accent" : "text-muted-foreground/70 group-hover:text-foreground"}>
+                    <span className={tab === n.key ? "text-gold" : "text-muted-foreground/70 group-hover:text-foreground"}>
                       {n.icon}
                     </span>
                     {n.label}

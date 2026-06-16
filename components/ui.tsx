@@ -12,7 +12,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "panel-grad rounded-lg border border-border bg-panel glow-border",
+        "panel-grad rounded-lg border border-border bg-panel glow-border transition-colors duration-200 hover:border-gold/25",
         className
       )}
       {...props}
