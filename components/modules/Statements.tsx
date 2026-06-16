@@ -14,6 +14,12 @@ import {
   BookOpen,
   FileText,
   Sigma,
+  MapPin,
+  Banknote,
+  Users,
+  Share2,
+  Link2,
+  Gauge,
   Layers3,
   CalendarPlus,
   Flame,
@@ -634,7 +640,98 @@ function realDailyTicker(): string {
   return REAL_DAILY_POOL[epochDay % REAL_DAILY_POOL.length];
 }
 
-type View = "overview" | "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook" | "formulas";
+type View =
+  | "overview"
+  | "addresses"
+  | "accounts"
+  | "management"
+  | "ownership"
+  | "related"
+  | "credit"
+  | "reports"
+  | "analysis"
+  | "comparisons"
+  | "chart"
+  | "leasing"
+  | "liens"
+  | "bills"
+  | "edit"
+  | "seasonality"
+  | "analyst"
+  | "quiz"
+  | "playbook"
+  | "formulas";
+
+/** Generic CUBE-style "no data" section (registry fields we don't have without a CUBE connection). */
+function NoDataSection({ title, note }: { title: string; note: string }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="font-display text-xl font-semibold text-foreground">{title}</h2>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-muted-foreground">
+            <Lock size={22} />
+          </div>
+          <p className="text-sm font-medium text-foreground">Nema dostupnih podataka</p>
+          <p className="max-w-md text-xs leading-relaxed text-muted-foreground">{note}</p>
+          <p className="max-w-md text-[11px] text-muted-foreground/70">
+            Ovi podaci dolaze iz APR / CUBE registra — dostupno tek uz CUBE povezivanje (Chrome ekstenzija).
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/** Kreditna ocena — analytic score with factor breakdown derived from the statements. */
+function CreditScoreSection({ c }: { c: StatementCase }) {
+  const a = analyseCase(c);
+  const L = a.latest;
+  if (!L) return <NoDataSection title="Kreditna ocena" note="Unesi bar dve godine podataka da bi se izračunala ocena." />;
+
+  const factors = [
+    { label: "Rast prihoda", val: `${a.revenueCagr.toFixed(1)}% CAGR`, pts: a.revenueCagr > 8 ? 12 : a.revenueCagr > 0 ? 6 : -8 },
+    { label: "Profitabilnost", val: L.netIncome > 0 ? "pozitivna" : "gubitak", pts: L.netIncome > 0 ? 10 : -12 },
+    { label: "Zaduženost (neto dug/EBITDA)", val: `${L.netDebtToEbitda.toFixed(1)}x`, pts: L.netDebtToEbitda < 2 ? 12 : L.netDebtToEbitda > 4 ? -12 : 0 },
+    { label: "Likvidnost (current)", val: `${L.currentRatio.toFixed(1)}x`, pts: L.currentRatio >= 1 ? 6 : -6 },
+    { label: "Prinos (ROE)", val: `${L.roe.toFixed(1)}%`, pts: L.roe > 12 ? 8 : 0 },
+  ];
+  const score = Math.max(5, Math.min(98, 50 + factors.reduce((s, f) => s + f.pts, 0)));
+  const band = score >= 70 ? { t: "Nizak rizik", c: "text-positive" } : score >= 45 ? { t: "Umeren rizik", c: "text-gold" } : { t: "Povišen rizik", c: "text-negative" };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-display text-xl font-semibold text-foreground">Kreditna ocena</h2>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-1 py-8">
+            <span className={`font-display text-5xl font-bold ${band.c}`}>{score}</span>
+            <span className={`text-sm font-semibold ${band.c}`}>{band.t}</span>
+            <span className="text-[11px] text-muted-foreground">skala 5–98 (analitička)</span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="px-5 py-1">
+            {factors.map((f) => (
+              <div key={f.label} className="flex items-center justify-between border-b border-border/60 py-3 last:border-0">
+                <span className="text-sm text-muted-foreground">{f.label}</span>
+                <span className="flex items-center gap-3 text-sm">
+                  <span className="font-medium text-foreground">{f.val}</span>
+                  <span className={`w-10 text-right font-mono text-xs ${f.pts > 0 ? "text-positive" : f.pts < 0 ? "text-negative" : "text-muted-foreground"}`}>
+                    {f.pts > 0 ? "+" : ""}{f.pts}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Naša analitička ocena (nije zvanični APR kreditni rejting) — izvedena iz unetih/povučenih finansija.
+      </p>
+    </div>
+  );
+}
 
 /** CUBE-style company overview (clean header + status cards + details panel), EY colors. */
 function CompanyOverview({ c }: { c: StatementCase }) {
@@ -768,17 +865,29 @@ function CaseDetail({
     onChange({ ...c, periods: c.periods.filter((p) => !p.projected) });
   }
 
-  const sections: { key: View; label: string; icon: React.ReactNode }[] = [
-    { key: "overview", label: "Pregled kompanije", icon: <Layers3 size={15} /> },
-    { key: "reports", label: "Sažeti finansijski podaci", icon: <Calculator size={15} /> },
-    { key: "analysis", label: "Finansije i racia", icon: <LineIcon size={15} /> },
-    { key: "analyst", label: "Analiza i procena", icon: <FileText size={15} /> },
-    { key: "seasonality", label: "Sezonalnost", icon: <CalendarPlus size={15} /> },
-    { key: "edit", label: "Unos podataka", icon: <Layers3 size={15} /> },
-    { key: "quiz", label: "EY Kviz", icon: <HelpCircle size={15} /> },
-    { key: "playbook", label: "Case Playbook", icon: <BookOpen size={15} /> },
-    { key: "formulas", label: "Formule", icon: <Sigma size={15} /> },
+  const sections: { key: View; label: string; icon: React.ReactNode; group: string }[] = [
+    { key: "overview", label: "Pregled kompanije", icon: <Layers3 size={15} />, group: "Profil kompanije" },
+    { key: "addresses", label: "Adrese i kontakti", icon: <MapPin size={15} />, group: "Profil kompanije" },
+    { key: "accounts", label: "Računi i blokade", icon: <Banknote size={15} />, group: "Profil kompanije" },
+    { key: "management", label: "Rukovodstvo i zaposleni", icon: <Users size={15} />, group: "Profil kompanije" },
+    { key: "ownership", label: "Vlasnička struktura", icon: <Share2 size={15} />, group: "Profil kompanije" },
+    { key: "related", label: "Povezana lica", icon: <Link2 size={15} />, group: "Profil kompanije" },
+    { key: "credit", label: "Kreditna ocena", icon: <Gauge size={15} />, group: "Profil kompanije" },
+    { key: "reports", label: "Sažeti finansijski podaci", icon: <Calculator size={15} />, group: "Finansije" },
+    { key: "analysis", label: "Finansije i racia", icon: <LineIcon size={15} />, group: "Finansije" },
+    { key: "comparisons", label: "Finansijska poređenja", icon: <Layers3 size={15} />, group: "Finansije" },
+    { key: "chart", label: "Grafikon", icon: <LineIcon size={15} />, group: "Finansije" },
+    { key: "leasing", label: "Finansijski lizing", icon: <FileText size={15} />, group: "Finansije" },
+    { key: "liens", label: "Založna prava", icon: <Lock size={15} />, group: "Finansije" },
+    { key: "bills", label: "Menice", icon: <FileText size={15} />, group: "Finansije" },
+    { key: "analyst", label: "Analiza i procena", icon: <FileText size={15} />, group: "EY alati" },
+    { key: "seasonality", label: "Sezonalnost", icon: <CalendarPlus size={15} />, group: "EY alati" },
+    { key: "edit", label: "Unos podataka", icon: <Calculator size={15} />, group: "EY alati" },
+    { key: "quiz", label: "EY Kviz", icon: <HelpCircle size={15} />, group: "EY alati" },
+    { key: "playbook", label: "Case Playbook", icon: <BookOpen size={15} />, group: "EY alati" },
+    { key: "formulas", label: "Formule", icon: <Sigma size={15} />, group: "EY alati" },
   ];
+  const navGroups = ["Profil kompanije", "Finansije", "EY alati"];
 
   return (
     <div>
@@ -815,27 +924,39 @@ function CaseDetail({
       {/* CUBE-style two-column layout: left section nav + content */}
       <div className="flex flex-col gap-4 lg:flex-row">
         <nav className="flex shrink-0 gap-1 overflow-x-auto rounded-lg border border-border bg-panel p-1.5 lg:w-64 lg:flex-col lg:overflow-visible">
-          {sections.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setView(s.key)}
-              className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors lg:w-full ${
-                view === s.key
-                  ? "bg-gold/15 text-gold shadow-[inset_2px_0_0_0_hsl(var(--gold))]"
-                  : "text-muted-foreground hover:bg-elevated hover:text-foreground"
-              }`}
+          {navGroups.flatMap((g) => [
+            <div
+              key={`h-${g}`}
+              className="hidden w-full px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55 first:pt-1 lg:block"
             >
-              <span className={view === s.key ? "text-gold" : "text-muted-foreground/70"}>{s.icon}</span>
-              <span className="hidden sm:inline">{s.label}</span>
-            </button>
-          ))}
+              {g}
+            </div>,
+            ...sections
+              .filter((s) => s.group === g)
+              .map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setView(s.key)}
+                  className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors lg:w-full ${
+                    view === s.key
+                      ? "bg-gold/15 text-gold shadow-[inset_2px_0_0_0_hsl(var(--gold))]"
+                      : "text-muted-foreground hover:bg-elevated hover:text-foreground"
+                  }`}
+                >
+                  <span className={view === s.key ? "text-gold" : "text-muted-foreground/70"}>{s.icon}</span>
+                  <span className="hidden sm:inline">{s.label}</span>
+                </button>
+              )),
+          ])}
         </nav>
 
         <div className="min-w-0 flex-1">
           {view === "overview" && <CompanyOverview c={c} />}
+          {view === "credit" && <CreditScoreSection c={c} />}
           {view === "reports" && <ReportsView c={c} />}
           {view === "seasonality" && <SeasonalityView c={c} onChange={onChange} />}
           {view === "analysis" && <AnalysisView c={c} />}
+          {view === "chart" && <AnalysisView c={c} />}
           {view === "edit" && (
             <InputsView
               c={c}
@@ -848,6 +969,15 @@ function CaseDetail({
           {view === "analyst" && <AnalystView c={c} />}
           {view === "playbook" && <CasePlaybook />}
           {view === "formulas" && <Formulas />}
+          {view === "addresses" && <NoDataSection title="Adrese i kontakti" note="Adresa sedišta, kontakt podaci i lokacije poslovanja." />}
+          {view === "accounts" && <NoDataSection title="Računi i blokade" note="Brojevi tekućih računa, banke i eventualne blokade." />}
+          {view === "management" && <NoDataSection title="Rukovodstvo i zaposleni" note="Direktori, zastupnici i broj zaposlenih." />}
+          {view === "ownership" && <NoDataSection title="Vlasnička struktura" note="Vlasnici, udeli i krajnji stvarni vlasnici (UBO)." />}
+          {view === "related" && <NoDataSection title="Povezana lica" note="Povezana pravna lica i međusobna učešća." />}
+          {view === "comparisons" && <NoDataSection title="Finansijska poređenja" note="Poređenje sa firmama iz iste delatnosti i veličine." />}
+          {view === "leasing" && <NoDataSection title="Finansijski lizing" note="Aktivni ugovori o finansijskom lizingu." />}
+          {view === "liens" && <NoDataSection title="Založna prava" note="Registrovana založna prava i hipoteke." />}
+          {view === "bills" && <NoDataSection title="Menice" note="Registrovane menice i eventualni protesti." />}
         </div>
       </div>
     </div>
