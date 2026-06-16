@@ -10,6 +10,7 @@ import {
   HelpCircle,
   Eye,
   Check,
+  CheckCircle2,
   BookOpen,
   FileText,
   Sigma,
@@ -633,7 +634,96 @@ function realDailyTicker(): string {
   return REAL_DAILY_POOL[epochDay % REAL_DAILY_POOL.length];
 }
 
-type View = "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook" | "formulas";
+type View = "overview" | "reports" | "edit" | "seasonality" | "analysis" | "analyst" | "quiz" | "playbook" | "formulas";
+
+/** CUBE-style company overview (clean header + status cards + details panel), EY colors. */
+function CompanyOverview({ c }: { c: StatementCase }) {
+  const a = analyseCase(c);
+  const L = a.latest;
+  const isReal = c.id.startsWith("sec");
+  const revealed = c.revealed;
+  const displayName = revealed ? c.actualBusiness || c.name : "Skrivena kompanija (otkrij u EY Kvizu)";
+  const lastYear = c.periods.filter((p) => !p.projected).at(-1)?.label || "—";
+  const yearsCount = c.periods.filter((p) => !p.projected).length;
+
+  // Simple analytic ("kreditna") score 5–98 from the fundamentals.
+  let score = 50;
+  if (L) {
+    if (a.revenueCagr > 8) score += 12;
+    else if (a.revenueCagr > 0) score += 6;
+    else score -= 8;
+    score += L.netIncome > 0 ? 10 : -12;
+    if (L.netDebtToEbitda < 2) score += 12;
+    else if (L.netDebtToEbitda > 4) score -= 12;
+    score += L.currentRatio >= 1 ? 6 : -6;
+    if (L.roe > 12) score += 8;
+    score = Math.max(5, Math.min(98, Math.round(score)));
+  }
+  const scoreColor = score >= 70 ? "text-positive" : score >= 45 ? "text-gold" : "text-negative";
+
+  const StatusRow = ({ label, value, ok }: { label: string; value: string; ok?: boolean }) => (
+    <div className="flex items-center justify-between border-b border-border/60 py-3 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`flex items-center gap-1.5 text-sm font-semibold ${ok === false ? "text-muted-foreground" : ok ? "text-positive" : "text-foreground"}`}>
+        {ok && <CheckCircle2 size={15} />}
+        {value}
+      </span>
+    </div>
+  );
+  const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="grid grid-cols-[140px_1fr] gap-3 border-b border-border/60 py-3 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-foreground">{displayName}</h2>
+        <div className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+          <span>Valuta: <span className="text-foreground">{c.currency}</span></span>
+          <span>Godine podataka: <span className="text-foreground">{yearsCount}</span></span>
+          <span>Poslednja: <span className="text-foreground">{lastYear}</span></span>
+          <span>Izvor: <span className="text-gold">{isReal ? "SEC EDGAR (zvanično)" : "Trening (sintetičko)"}</span></span>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
+        {/* Status card */}
+        <Card>
+          <CardContent className="px-5 py-1">
+            <StatusRow label="Status kompanije" value="Aktivan" ok />
+            <StatusRow label="Status podataka" value={revealed ? "Otkriveno" : "Skriveno"} ok={revealed} />
+            <StatusRow label="Tip izvora" value={isReal ? "Pravi filing" : "Sintetičko"} ok={isReal} />
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-muted-foreground">Analitička ocena</span>
+              <span className={`font-display text-2xl font-bold ${scoreColor}`}>{score}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Details panel */}
+        <Card>
+          <CardContent className="px-5 py-1">
+            <DetailRow label="Naziv" value={revealed ? c.actualBusiness || c.name : "—"} />
+            <DetailRow label="Sektor / delatnost" value={revealed ? c.actualSector || "—" : "skriveno"} />
+            <DetailRow label="Veličina (prihod)" value={L ? eur(L.revenue) : "—"} />
+            <DetailRow label="EBITDA marža" value={L ? `${L.ebitdaMargin.toFixed(1)}%` : "—"} />
+            <DetailRow label="Neto dug / EBITDA" value={L ? `${L.netDebtToEbitda.toFixed(1)}x` : "—"} />
+            <DetailRow label="Broj godina (stvarne + projekcija)" value={`${yearsCount} + ${c.periods.length - yearsCount}`} />
+            <DetailRow label="Izvor podataka" value={isReal ? "SEC EDGAR — zvanični 10-K" : "Trening arhetip"} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Pregled finansijskih podataka{lastYear !== "—" ? ` ${lastYear}` : ""} — detalji u sekcijama levo (Sažeti finansijski podaci, Finansije i racia, Analiza).
+      </p>
+    </div>
+  );
+}
 
 function CaseDetail({
   c,
@@ -646,7 +736,7 @@ function CaseDetail({
   onChange: (c: StatementCase) => void;
   onDelete: () => void;
 }) {
-  const [view, setView] = useState<View>("reports");
+  const [view, setView] = useState<View>("overview");
 
   const actualCount = c.periods.filter((p) => !p.projected).length;
   const projCount = c.periods.filter((p) => p.projected).length;
@@ -678,20 +768,22 @@ function CaseDetail({
     onChange({ ...c, periods: c.periods.filter((p) => !p.projected) });
   }
 
-  const tabs: { key: View; label: string; icon: React.ReactNode }[] = [
-    { key: "reports", label: "Reports", icon: <Layers3 size={14} /> },
-    { key: "analyst", label: "Analyst View", icon: <FileText size={14} /> },
-    { key: "seasonality", label: "Seasonality", icon: <CalendarPlus size={14} /> },
-    { key: "analysis", label: "Analysis", icon: <LineIcon size={14} /> },
-    { key: "edit", label: "Edit data", icon: <Calculator size={14} /> },
-    { key: "quiz", label: "EY Quiz", icon: <HelpCircle size={14} /> },
-    { key: "playbook", label: "Case Playbook", icon: <BookOpen size={14} /> },
-    { key: "formulas", label: "Formulas", icon: <Sigma size={14} /> },
+  const sections: { key: View; label: string; icon: React.ReactNode }[] = [
+    { key: "overview", label: "Pregled kompanije", icon: <Layers3 size={15} /> },
+    { key: "reports", label: "Sažeti finansijski podaci", icon: <Calculator size={15} /> },
+    { key: "analysis", label: "Finansije i racia", icon: <LineIcon size={15} /> },
+    { key: "analyst", label: "Analiza i procena", icon: <FileText size={15} /> },
+    { key: "seasonality", label: "Sezonalnost", icon: <CalendarPlus size={15} /> },
+    { key: "edit", label: "Unos podataka", icon: <Layers3 size={15} /> },
+    { key: "quiz", label: "EY Kviz", icon: <HelpCircle size={15} /> },
+    { key: "playbook", label: "Case Playbook", icon: <BookOpen size={15} /> },
+    { key: "formulas", label: "Formule", icon: <Sigma size={15} /> },
   ];
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      {/* Top bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ChevronLeft size={18} />
@@ -699,19 +791,19 @@ function CaseDetail({
           <Input
             value={c.name}
             onChange={(e) => onChange({ ...c, name: e.target.value })}
-            className="h-9 w-48 font-display text-base font-semibold"
+            className="h-9 w-56 font-display text-base font-semibold"
           />
-          <Badge variant="accent">{actualCount} actual</Badge>
-          {projCount > 0 && <Badge variant="gold">+{projCount} projected</Badge>}
+          <Badge variant="accent">{actualCount} god.</Badge>
+          {projCount > 0 && <Badge variant="gold">+{projCount} proj.</Badge>}
         </div>
         <div className="flex gap-2">
           {projCount === 0 ? (
             <Button variant="gold" onClick={buildProjection}>
-              <CalendarPlus size={14} /> Add 3Y projection
+              <CalendarPlus size={14} /> Dodaj 3g projekciju
             </Button>
           ) : (
             <Button variant="secondary" onClick={clearProjection}>
-              <Trash2 size={14} /> Clear projection
+              <Trash2 size={14} /> Obriši projekciju
             </Button>
           )}
           <Button variant="destructive" size="icon" onClick={onDelete}>
@@ -720,38 +812,44 @@ function CaseDetail({
         </div>
       </div>
 
-      <div className="mb-5 flex gap-1 overflow-x-auto rounded-lg border border-border bg-panel p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setView(t.key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-              view === t.key
-                ? "bg-accent/15 text-accent"
-                : "text-muted-foreground hover:bg-elevated"
-            }`}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* CUBE-style two-column layout: left section nav + content */}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto rounded-lg border border-border bg-panel p-1.5 lg:w-64 lg:flex-col lg:overflow-visible">
+          {sections.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setView(s.key)}
+              className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors lg:w-full ${
+                view === s.key
+                  ? "bg-gold/15 text-gold shadow-[inset_2px_0_0_0_hsl(var(--gold))]"
+                  : "text-muted-foreground hover:bg-elevated hover:text-foreground"
+              }`}
+            >
+              <span className={view === s.key ? "text-gold" : "text-muted-foreground/70"}>{s.icon}</span>
+              <span className="hidden sm:inline">{s.label}</span>
+            </button>
+          ))}
+        </nav>
 
-      {view === "reports" && <ReportsView c={c} />}
-      {view === "seasonality" && <SeasonalityView c={c} onChange={onChange} />}
-      {view === "analysis" && <AnalysisView c={c} />}
-      {view === "edit" && (
-        <InputsView
-          c={c}
-          onUpdatePeriod={updatePeriod}
-          onRemovePeriod={removePeriod}
-          onAddYear={addPeriod}
-        />
-      )}
-      {view === "quiz" && <QuizView c={c} onChange={onChange} />}
-      {view === "analyst" && <AnalystView c={c} />}
-      {view === "playbook" && <CasePlaybook />}
-      {view === "formulas" && <Formulas />}
+        <div className="min-w-0 flex-1">
+          {view === "overview" && <CompanyOverview c={c} />}
+          {view === "reports" && <ReportsView c={c} />}
+          {view === "seasonality" && <SeasonalityView c={c} onChange={onChange} />}
+          {view === "analysis" && <AnalysisView c={c} />}
+          {view === "edit" && (
+            <InputsView
+              c={c}
+              onUpdatePeriod={updatePeriod}
+              onRemovePeriod={removePeriod}
+              onAddYear={addPeriod}
+            />
+          )}
+          {view === "quiz" && <QuizView c={c} onChange={onChange} />}
+          {view === "analyst" && <AnalystView c={c} />}
+          {view === "playbook" && <CasePlaybook />}
+          {view === "formulas" && <Formulas />}
+        </div>
+      </div>
     </div>
   );
 }
