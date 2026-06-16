@@ -140,6 +140,7 @@ export interface SecPeriod {
   };
   seasonality: number[];
   segments: { name: string; value: number }[];
+  reported: { is: Record<string, number>; bs: Record<string, number> };
 }
 
 export interface SecResult {
@@ -220,6 +221,20 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
     false
   );
   const tax = annualSeries(facts, ["IncomeTaxExpenseBenefit"], false);
+  const pretax = annualSeries(
+    facts,
+    [
+      "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+      "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+      "IncomeLossFromContinuingOperationsBeforeIncomeTaxesAndMinorityInterest",
+    ],
+    false
+  );
+  const netIncome = annualSeries(
+    facts,
+    ["NetIncomeLoss", "ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"],
+    false
+  );
 
   // Balance-sheet series (instant)
   const cash = annualSeries(
@@ -325,6 +340,47 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
     const otherLTL = Math.max(0, tl - cl - ltV);
     const equityV = eq[y] != null ? eq[y] : ta - tl;
 
+    // 1:1 reported line items, as they appear in the SEC filing.
+    const GP = R - C;
+    const ebitV = ebit[y] != null ? ebit[y] : GP - opexOther;
+    const pretaxV = pretax[y] != null ? pretax[y] : ebitV - (interest[y] || 0);
+    const niV = netIncome[y] != null ? netIncome[y] : pretaxV - (tax[y] || 0);
+    const reported = {
+      is: {
+        "Revenue": R,
+        "Cost of revenue": C,
+        "Gross profit": GP,
+        "Research & development": rnd[y] || 0,
+        "Selling, general & admin": sga[y] || 0,
+        "Operating income (EBIT)": ebitV,
+        "Depreciation & amortisation": DA,
+        "Interest expense": interest[y] || 0,
+        "Pre-tax income": pretaxV,
+        "Income tax": tax[y] || 0,
+        "Net income": niV,
+      },
+      bs: {
+        "Cash & equivalents": cashV,
+        "Receivables": recvV,
+        "Inventory": invV,
+        "Other current assets": otherCA,
+        "Total current assets": ca || cashV + recvV + invV + otherCA,
+        "Property, plant & equipment": ppeV,
+        "Goodwill": goodwill[y] || 0,
+        "Other intangibles": intang[y] || 0,
+        "Other non-current assets": otherNCA,
+        "Total assets": ta,
+        "Accounts payable": payV,
+        "Short-term debt": stV,
+        "Other current liabilities": otherCL,
+        "Total current liabilities": cl || payV + stV + otherCL,
+        "Long-term debt": ltV,
+        "Other non-current liabilities": otherLTL,
+        "Total liabilities": tl,
+        "Total equity": equityV,
+      },
+    };
+
     return {
       label: `FY${y}`,
       pl: {
@@ -356,6 +412,7 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
       },
       seasonality: Array(12).fill(100 / 12),
       segments: [],
+      reported,
     };
   });
 

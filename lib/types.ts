@@ -169,6 +169,11 @@ export interface StatementPeriod {
   seasonality: number[]; // 12 monthly revenue weights
   segments: { name: string; value: number }[]; // revenue breakdown
   projected?: boolean; // true = analyst projection (not actuals)
+  /** Line items exactly as reported in the SEC filing (1:1), keyed by label. */
+  reported?: {
+    is: Record<string, number>;
+    bs: Record<string, number>;
+  };
 }
 
 export interface StatementCase {

@@ -197,6 +197,7 @@ export function Statements() {
         seasonality: p.seasonality,
         segments: p.segments,
         projected: false,
+        reported: p.reported,
       }));
       const newCase: StatementCase = {
         id,
@@ -248,6 +249,7 @@ export function Statements() {
         seasonality: p.seasonality,
         segments: p.segments,
         projected: false,
+        reported: p.reported,
       }));
       const blindCase: StatementCase = {
         id: realDailyId,
@@ -1097,58 +1099,123 @@ function ReportsView({ c }: { c: StatementCase }) {
   const pctMargin = (num: number, den: number) =>
     den ? `${((num / den) * 100).toFixed(0)}%` : "";
 
-  // Income statement
-  const isRows: MatrixRow[] = [
-    { label: "Revenue", vals: an.map((a) => a.revenue), bold: true },
-    { label: "Cost of goods sold", vals: sorted.map((p) => p.pl.cogs), indent: true },
-    {
-      label: "Gross profit",
-      vals: an.map((a) => a.grossProfit),
-      bold: true,
-      pct: an.map((a) => `${a.grossMargin.toFixed(0)}%`),
-    },
-    { label: "Salaries & wages", vals: sorted.map((p) => p.pl.salaries), indent: true },
-    { label: "Transport & logistics", vals: sorted.map((p) => p.pl.transport), indent: true },
-    { label: "Marketing & selling", vals: sorted.map((p) => p.pl.marketing), indent: true },
-    { label: "Other operating expenses", vals: sorted.map((p) => p.pl.opex), indent: true },
-    {
-      label: "EBITDA",
-      vals: an.map((a) => a.ebitda),
-      bold: true,
-      pct: an.map((a) => `${a.ebitdaMargin.toFixed(0)}%`),
-    },
-    { label: "Depreciation & amortisation", vals: sorted.map((p) => p.pl.da), indent: true },
-    { label: "EBIT", vals: an.map((a) => a.ebit), bold: true },
-    { label: "Interest", vals: sorted.map((p) => p.pl.interest), indent: true },
-    { label: "Tax", vals: sorted.map((p) => p.pl.tax), indent: true },
-    {
-      label: "Net income",
-      vals: an.map((a) => a.netIncome),
-      bold: true,
-      pct: an.map((a) => `${a.netMargin.toFixed(0)}%`),
-    },
-  ];
+  // SEC cases carry 1:1 reported line items — render those faithfully.
+  const hasReported = sorted.some((p) => p.reported);
+  const repVal = (
+    p: StatementPeriod,
+    a: (typeof an)[number],
+    label: string,
+    kind: "is" | "bs"
+  ): number | null => {
+    if (p.reported) {
+      const v = p.reported[kind][label];
+      return v === undefined ? null : v;
+    }
+    const mIS: Record<string, number> = {
+      Revenue: a.revenue,
+      "Cost of revenue": p.pl.cogs,
+      "Gross profit": a.grossProfit,
+      "Operating income (EBIT)": a.ebit,
+      "Depreciation & amortisation": p.pl.da,
+      "Interest expense": p.pl.interest,
+      "Pre-tax income": a.pbt,
+      "Income tax": p.pl.tax,
+      "Net income": a.netIncome,
+    };
+    const mBS: Record<string, number> = {
+      "Cash & equivalents": p.bs.cash,
+      Receivables: p.bs.receivables,
+      Inventory: p.bs.inventory,
+      "Other current assets": p.bs.otherCA,
+      "Total current assets": a.totalCurrentAssets,
+      "Property, plant & equipment": p.bs.ppe,
+      "Other intangibles": p.bs.intangibles,
+      "Other non-current assets": p.bs.otherNCA,
+      "Total assets": a.totalAssets,
+      "Accounts payable": p.bs.payables,
+      "Short-term debt": p.bs.shortDebt,
+      "Other current liabilities": p.bs.otherCL,
+      "Long-term debt": p.bs.longDebt,
+      "Other non-current liabilities": p.bs.otherLTL,
+      "Total liabilities": a.totalLiabilities,
+      "Total equity": a.totalEquity,
+    };
+    const m = kind === "is" ? mIS : mBS;
+    return label in m ? m[label] : null;
+  };
 
-  // Balance sheet
-  const bsRows: MatrixRow[] = [
-    { label: "Cash", vals: sorted.map((p) => p.bs.cash), indent: true },
-    { label: "Receivables", vals: sorted.map((p) => p.bs.receivables), indent: true },
-    { label: "Inventory", vals: sorted.map((p) => p.bs.inventory), indent: true },
-    { label: "Other current assets", vals: sorted.map((p) => p.bs.otherCA), indent: true },
-    { label: "Total current assets", vals: an.map((a) => a.totalCurrentAssets), bold: true },
-    { label: "PP&E", vals: sorted.map((p) => p.bs.ppe), indent: true },
-    { label: "Intangibles & goodwill", vals: sorted.map((p) => p.bs.intangibles), indent: true },
-    { label: "Other non-current assets", vals: sorted.map((p) => p.bs.otherNCA), indent: true },
-    { label: "Total assets", vals: an.map((a) => a.totalAssets), bold: true },
-    { label: "Payables", vals: sorted.map((p) => p.bs.payables), indent: true },
-    { label: "Short-term debt", vals: sorted.map((p) => p.bs.shortDebt), indent: true },
-    { label: "Other current liabilities", vals: sorted.map((p) => p.bs.otherCL), indent: true },
-    { label: "Long-term debt", vals: sorted.map((p) => p.bs.longDebt), indent: true },
-    { label: "Other non-current liabilities", vals: sorted.map((p) => p.bs.otherLTL), indent: true },
-    { label: "Total liabilities", vals: an.map((a) => a.totalLiabilities), bold: true },
-    { label: "Total equity", vals: an.map((a) => a.totalEquity), bold: true },
-    { label: "Net debt", vals: an.map((a) => a.netDebt), memo: true },
-  ];
+  let isRows: MatrixRow[];
+  let bsRows: MatrixRow[];
+
+  if (hasReported) {
+    const IS_LABELS = [
+      "Revenue", "Cost of revenue", "Gross profit", "Research & development",
+      "Selling, general & admin", "Operating income (EBIT)", "Depreciation & amortisation",
+      "Interest expense", "Pre-tax income", "Income tax", "Net income",
+    ];
+    const IS_BOLD = new Set(["Revenue", "Gross profit", "Operating income (EBIT)", "Pre-tax income", "Net income"]);
+    isRows = IS_LABELS.map((label) => ({
+      label,
+      vals: sorted.map((p, i) => repVal(p, an[i], label, "is")),
+      bold: IS_BOLD.has(label),
+      indent: !IS_BOLD.has(label),
+      pct:
+        label === "Gross profit" || label === "Net income"
+          ? sorted.map((p, i) => {
+              const r = repVal(p, an[i], label, "is");
+              return r != null && an[i].revenue ? `${((r / an[i].revenue) * 100).toFixed(0)}%` : null;
+            })
+          : undefined,
+    }));
+    const BS_LABELS = [
+      "Cash & equivalents", "Receivables", "Inventory", "Other current assets", "Total current assets",
+      "Property, plant & equipment", "Goodwill", "Other intangibles", "Other non-current assets", "Total assets",
+      "Accounts payable", "Short-term debt", "Other current liabilities", "Total current liabilities",
+      "Long-term debt", "Other non-current liabilities", "Total liabilities", "Total equity",
+    ];
+    const BS_BOLD = new Set(["Total current assets", "Total assets", "Total current liabilities", "Total liabilities", "Total equity"]);
+    bsRows = BS_LABELS.map((label) => ({
+      label,
+      vals: sorted.map((p, i) => repVal(p, an[i], label, "bs")),
+      bold: BS_BOLD.has(label),
+      indent: !BS_BOLD.has(label),
+    }));
+  } else {
+    isRows = [
+      { label: "Revenue", vals: an.map((a) => a.revenue), bold: true },
+      { label: "Cost of goods sold", vals: sorted.map((p) => p.pl.cogs), indent: true },
+      { label: "Gross profit", vals: an.map((a) => a.grossProfit), bold: true, pct: an.map((a) => `${a.grossMargin.toFixed(0)}%`) },
+      { label: "Salaries & wages", vals: sorted.map((p) => p.pl.salaries), indent: true },
+      { label: "Transport & logistics", vals: sorted.map((p) => p.pl.transport), indent: true },
+      { label: "Marketing & selling", vals: sorted.map((p) => p.pl.marketing), indent: true },
+      { label: "Other operating expenses", vals: sorted.map((p) => p.pl.opex), indent: true },
+      { label: "EBITDA", vals: an.map((a) => a.ebitda), bold: true, pct: an.map((a) => `${a.ebitdaMargin.toFixed(0)}%`) },
+      { label: "Depreciation & amortisation", vals: sorted.map((p) => p.pl.da), indent: true },
+      { label: "EBIT", vals: an.map((a) => a.ebit), bold: true },
+      { label: "Interest", vals: sorted.map((p) => p.pl.interest), indent: true },
+      { label: "Tax", vals: sorted.map((p) => p.pl.tax), indent: true },
+      { label: "Net income", vals: an.map((a) => a.netIncome), bold: true, pct: an.map((a) => `${a.netMargin.toFixed(0)}%`) },
+    ];
+    bsRows = [
+      { label: "Cash", vals: sorted.map((p) => p.bs.cash), indent: true },
+      { label: "Receivables", vals: sorted.map((p) => p.bs.receivables), indent: true },
+      { label: "Inventory", vals: sorted.map((p) => p.bs.inventory), indent: true },
+      { label: "Other current assets", vals: sorted.map((p) => p.bs.otherCA), indent: true },
+      { label: "Total current assets", vals: an.map((a) => a.totalCurrentAssets), bold: true },
+      { label: "PP&E", vals: sorted.map((p) => p.bs.ppe), indent: true },
+      { label: "Intangibles & goodwill", vals: sorted.map((p) => p.bs.intangibles), indent: true },
+      { label: "Other non-current assets", vals: sorted.map((p) => p.bs.otherNCA), indent: true },
+      { label: "Total assets", vals: an.map((a) => a.totalAssets), bold: true },
+      { label: "Payables", vals: sorted.map((p) => p.bs.payables), indent: true },
+      { label: "Short-term debt", vals: sorted.map((p) => p.bs.shortDebt), indent: true },
+      { label: "Other current liabilities", vals: sorted.map((p) => p.bs.otherCL), indent: true },
+      { label: "Long-term debt", vals: sorted.map((p) => p.bs.longDebt), indent: true },
+      { label: "Other non-current liabilities", vals: sorted.map((p) => p.bs.otherLTL), indent: true },
+      { label: "Total liabilities", vals: an.map((a) => a.totalLiabilities), bold: true },
+      { label: "Total equity", vals: an.map((a) => a.totalEquity), bold: true },
+      { label: "Net debt", vals: an.map((a) => a.netDebt), memo: true },
+    ];
+  }
 
   // Cash flow (indirect) — first period has no prior, so it is blank
   const cf = caseCashFlows(c.periods);
@@ -1189,14 +1256,14 @@ function ReportsView({ c }: { c: StatementCase }) {
       </Card>
 
       <StatementMatrix
-        title="Income Statement"
-        subtitle="Revenue down to net income, with margins on the key lines"
+        title={hasReported ? "Income Statement — as reported (SEC EDGAR)" : "Income Statement"}
+        subtitle={hasReported ? "Line items 1:1 from the official 10-K; projected years (gold) are the analyst forecast" : "Revenue down to net income, with margins on the key lines"}
         cols={cols}
         rows={isRows}
       />
       <StatementMatrix
-        title="Balance Sheet"
-        subtitle="What the company owns and owes at each year-end — watch how it shifts"
+        title={hasReported ? "Balance Sheet — as reported (SEC EDGAR)" : "Balance Sheet"}
+        subtitle={hasReported ? "Line items 1:1 from the official 10-K (subtotals tie to the filing)" : "What the company owns and owes at each year-end — watch how it shifts"}
         cols={cols}
         rows={bsRows}
       />
