@@ -181,9 +181,11 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   );
   const cogs = annualSeries(
     facts,
-    ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold"],
+    ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold", "CostOfServices"],
     false
   );
+  const grossProfit = annualSeries(facts, ["GrossProfit"], false);
+  const costsAndExpenses = annualSeries(facts, ["CostsAndExpenses"], false);
   const ebit = annualSeries(facts, ["OperatingIncomeLoss"], false);
   const da = annualSeries(
     facts,
@@ -222,7 +224,14 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   );
   const recv = annualSeries(
     facts,
-    ["AccountsReceivableNetCurrent", "ReceivablesNetCurrent"],
+    [
+      "AccountsReceivableNetCurrent",
+      "ReceivablesNetCurrent",
+      "AccountsAndOtherReceivablesNetCurrent",
+      "AccountsAndNotesReceivableNet",
+      "AccountsReceivableNet",
+      "NontradeReceivablesCurrent",
+    ],
     true
   );
   const inv = annualSeries(facts, ["InventoryNet"], true);
@@ -270,8 +279,19 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
 
   const periods: SecPeriod[] = years.map((y) => {
     const R = revenue[y] || 0;
-    const C = cogs[y] || 0;
+    // Prefer a reported COGS tag; otherwise derive it from GrossProfit so the
+    // gross margin is accurate instead of a misleading 100%.
     const DA = da[y] || 0;
+    let C = cogs[y] || 0;
+    if (C === 0 && grossProfit[y] != null && grossProfit[y] < R) {
+      C = Math.max(0, R - grossProfit[y]);
+    }
+    // Single-step filers (e.g. franchises): derive direct costs from total
+    // operating costs minus SG&A / R&D / D&A so gross margin isn't a false 100%.
+    if (C === 0 && costsAndExpenses[y] != null) {
+      const derived = costsAndExpenses[y] - (sga[y] || 0) - (rnd[y] || 0) - DA;
+      if (derived > 0 && derived < R) C = derived;
+    }
     let opexOther: number;
     if (ebit[y] != null) opexOther = R - C - (ebit[y] + DA);
     else opexOther = (sga[y] || 0) + (rnd[y] || 0);

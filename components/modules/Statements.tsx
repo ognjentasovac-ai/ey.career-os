@@ -632,7 +632,7 @@ const REAL_DAILY_POOL = [
   "CAT", "DE", "BA", "GE", "HON", "MMM", "F", "GM",
   "XOM", "CVX", "COP",
   "T", "VZ", "DIS", "NFLX", "CMCSA",
-  "JPM", "V", "MA", "AXP",
+  "V", "MA",
   "UPS", "FDX",
 ];
 function realDailyTicker(): string {
