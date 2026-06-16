@@ -181,7 +181,15 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   );
   const cogs = annualSeries(
     facts,
-    ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold", "CostOfServices"],
+    [
+      "CostOfGoodsAndServicesSold",
+      "CostOfRevenue",
+      "CostOfGoodsSold",
+      "CostOfServices",
+      "CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization",
+      "CostOfGoodsSoldExcludingDepreciationDepletionAndAmortization",
+      "CostOfGoodsAndServicesSoldExcludingDepreciationDepletionAndAmortization",
+    ],
     false
   );
   const grossProfit = annualSeries(facts, ["GrossProfit"], false);
@@ -283,14 +291,16 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
     // gross margin is accurate instead of a misleading 100%.
     const DA = da[y] || 0;
     let C = cogs[y] || 0;
-    if (C === 0 && grossProfit[y] != null && grossProfit[y] < R) {
-      C = Math.max(0, R - grossProfit[y]);
-    }
-    // Single-step filers (e.g. franchises): derive direct costs from total
-    // operating costs minus SG&A / R&D / D&A so gross margin isn't a false 100%.
-    if (C === 0 && costsAndExpenses[y] != null) {
-      const derived = costsAndExpenses[y] - (sga[y] || 0) - (rnd[y] || 0) - DA;
-      if (derived > 0 && derived < R) C = derived;
+    // If COGS tag is missing or implausibly tiny (< 2% of revenue), derive it.
+    if (C < 0.02 * R) {
+      // 1. Authoritative: a reported GrossProfit gives the exact COGS.
+      if (grossProfit[y] != null && grossProfit[y] > 0 && grossProfit[y] < R) {
+        C = R - grossProfit[y];
+      } else if (costsAndExpenses[y] != null) {
+        // 2. Single-step filers: direct costs = total operating costs − SG&A − R&D − D&A.
+        const derived = costsAndExpenses[y] - (sga[y] || 0) - (rnd[y] || 0) - DA;
+        if (derived > 0.02 * R && derived < R) C = derived;
+      }
     }
     let opexOther: number;
     if (ebit[y] != null) opexOther = R - C - (ebit[y] + DA);

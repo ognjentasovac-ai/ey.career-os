@@ -626,13 +626,13 @@ function Mini({ label, value }: { label: string; value: React.ReactNode }) {
 /** Curated pool of real US-listed filers (10-K) across sectors for the daily challenge. */
 const REAL_DAILY_POOL = [
   "MSFT", "AAPL", "ORCL", "CRM", "ADBE", "NVDA", "INTC", "CSCO",
-  "WMT", "COST", "KR", "TGT", "HD", "LOW",
+  "WMT", "COST", "TGT", "HD", "LOW",
   "KO", "PEP", "PG", "CL", "NKE", "MCD", "SBUX", "MDLZ",
   "PFE", "JNJ", "MRK", "ABBV", "LLY", "UNH",
-  "CAT", "DE", "BA", "GE", "HON", "MMM", "F", "GM",
+  "CAT", "DE", "BA", "GE", "HON", "MMM", "F",
   "XOM", "CVX", "COP",
   "T", "VZ", "DIS", "NFLX", "CMCSA",
-  "V", "MA",
+  "V",
   "UPS", "FDX",
 ];
 function realDailyTicker(): string {
