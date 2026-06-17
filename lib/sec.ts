@@ -109,6 +109,66 @@ function annualSeries(
   return {};
 }
 
+/**
+ * Real monthly seasonality derived from the last 4 reported QUARTERS (10-Q),
+ * mapped to calendar months by each quarter's end date. Falls back to flat
+ * only when quarterly revenue can't be extracted.
+ */
+function quarterlySeasonality(facts: any, tags: string[]): number[] {
+  const flat = Array(12).fill(100 / 12);
+  const DAY = 86_400_000;
+  const roots = [facts?.facts?.["us-gaap"], facts?.facts?.["ifrs-full"]];
+  for (const gaap of roots) {
+    if (!gaap) continue;
+    for (const tag of tags) {
+      const node = gaap[tag];
+      if (!node?.units) continue;
+      const units: FactEntry[] =
+        node.units["USD"] || node.units["EUR"] || (Object.values(node.units)[0] as FactEntry[]);
+      if (!units) continue;
+      const annuals: Record<string, { end: string; val: number }> = {};
+      const quarters: Record<string, { end: string; val: number }> = {};
+      for (const e of units) {
+        if (!e.start) continue;
+        const days = (new Date(e.end).getTime() - new Date(e.start).getTime()) / DAY;
+        if (days >= 340 && days <= 380) annuals[e.end] = { end: e.end, val: e.val };
+        else if (days >= 80 && days <= 100) quarters[e.end] = { end: e.end, val: e.val };
+      }
+      const annualList = Object.values(annuals).sort((a, b) => b.end.localeCompare(a.end));
+      const qList = Object.values(quarters);
+      if (!annualList.length || qList.length < 3) continue;
+
+      // Take the most recent full year and the 3 discrete quarters inside it.
+      const A = annualList[0];
+      const Aend = new Date(A.end).getTime();
+      const inFY = qList
+        .filter((q) => {
+          const t = new Date(q.end).getTime();
+          return t <= Aend - 15 * DAY && t > Aend - 360 * DAY;
+        })
+        .sort((a, b) => a.end.localeCompare(b.end));
+      if (inFY.length < 3) continue;
+      const q123 = inFY.slice(-3);
+      const sum3 = q123.reduce((s, q) => s + q.val, 0);
+      const q4 = A.val - sum3; // Q4 isn't a standalone 10-Q — derive it
+      if (q4 / A.val < 0.1 || q4 / A.val > 0.55) continue; // sanity
+
+      const blocks = [
+        ...q123.map((q) => ({ endMonth: new Date(q.end).getUTCMonth(), val: q.val })),
+        { endMonth: new Date(A.end).getUTCMonth(), val: q4 }, // Q4 ends at the FY end
+      ];
+      const months = Array(12).fill(0);
+      for (const b of blocks) {
+        const w = ((b.val / A.val) * 100) / 3; // spread each quarter over its 3 months
+        for (let k = 0; k < 3; k++) months[(b.endMonth - k + 12) % 12] += w;
+      }
+      const s = months.reduce((a, b) => a + b, 0);
+      if (s > 0) return months.map((v) => (v / s) * 100);
+    }
+  }
+  return flat;
+}
+
 export interface SecPeriod {
   label: string;
   pl: {
@@ -300,6 +360,13 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   if (years.length === 0)
     throw new Error("Could not extract an annual revenue series from SEC data.");
 
+  const seasonality = quarterlySeasonality(facts, [
+    "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "Revenues",
+    "SalesRevenueNet",
+    "RevenueFromContractWithCustomerIncludingAssessedTax",
+  ]);
+
   const periods: SecPeriod[] = years.map((y) => {
     const R = revenue[y] || 0;
     // Prefer a reported COGS tag; otherwise derive it from GrossProfit so the
@@ -410,7 +477,7 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
         otherLTL,
         equity: equityV,
       },
-      seasonality: Array(12).fill(100 / 12),
+      seasonality,
       segments: [],
       reported,
     };
