@@ -67,13 +67,19 @@ type FactEntry = {
 
 const ANNUAL_FORMS = ["10-K", "10-K/A", "20-F", "20-F/A", "40-F"];
 
-/** Returns { fiscalYear: value } for annual facts of the first matching tag. */
+/**
+ * Returns { fiscalYear: value } merged across ALL matching tags. Earlier tags
+ * take priority per year; later (synonym) tags fill years that are missing or 0
+ * — companies often switch tag names over time (e.g. PP&E, D&A, debt), so a
+ * single tag misses recent years. Merging keeps every year populated.
+ */
 function annualSeries(
   facts: any,
   tags: string[],
   instant: boolean
 ): Record<number, number> {
   const roots = [facts?.facts?.["us-gaap"], facts?.facts?.["ifrs-full"]];
+  const out: Record<number, number> = {};
   for (const gaap of roots) {
     if (!gaap) continue;
     for (const tag of tags) {
@@ -101,12 +107,13 @@ function annualSeries(
           if (!byYear[year] || e.end > byYear[year].end) byYear[year] = e;
         }
       }
-      const out: Record<number, number> = {};
-      for (const y of Object.keys(byYear)) out[+y] = byYear[+y].val;
-      if (Object.keys(out).length) return out;
+      for (const y of Object.keys(byYear)) {
+        const yr = +y;
+        if (!out[yr]) out[yr] = byYear[yr].val; // fill missing / zero years
+      }
     }
   }
-  return {};
+  return out;
 }
 
 /**
@@ -262,6 +269,8 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
       "DepreciationDepletionAndAmortization",
       "DepreciationAmortizationAndAccretionNet",
       "DepreciationAndAmortization",
+      "DepreciationAmortizationAndOther",
+      "Depreciation",
     ],
     false
   );
@@ -277,7 +286,14 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   const rnd = annualSeries(facts, ["ResearchAndDevelopmentExpense"], false);
   const interest = annualSeries(
     facts,
-    ["InterestExpense", "InterestExpenseNonoperating", "InterestAndDebtExpense"],
+    [
+      "InterestExpense",
+      "InterestExpenseNonoperating",
+      "InterestAndDebtExpense",
+      "InterestExpenseDebt",
+      "InterestExpenseNet",
+      "InterestIncomeExpenseNet",
+    ],
     false
   );
   const tax = annualSeries(facts, ["IncomeTaxExpenseBenefit"], false);
@@ -302,6 +318,7 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
     [
       "CashAndCashEquivalentsAtCarryingValue",
       "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "CashCashEquivalentsAndShortTermInvestments",
     ],
     true
   );
@@ -319,7 +336,20 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   );
   const inv = annualSeries(facts, ["InventoryNet"], true);
   const curA = annualSeries(facts, ["AssetsCurrent"], true);
-  const ppe = annualSeries(facts, ["PropertyPlantAndEquipmentNet"], true);
+  const ppe = annualSeries(
+    facts,
+    [
+      "PropertyPlantAndEquipmentNet",
+      "PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization",
+    ],
+    true
+  );
+  const ppeGross = annualSeries(facts, ["PropertyPlantAndEquipmentGross"], true);
+  const accumDep = annualSeries(
+    facts,
+    ["AccumulatedDepreciationDepletionAndAmortizationPropertyPlantAndEquipment"],
+    true
+  );
   const goodwill = annualSeries(facts, ["Goodwill"], true);
   const intang = annualSeries(
     facts,
@@ -334,13 +364,23 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
   );
   const stDebt = annualSeries(
     facts,
-    ["LongTermDebtCurrent", "DebtCurrent", "ShortTermBorrowings"],
+    [
+      "LongTermDebtCurrent",
+      "DebtCurrent",
+      "ShortTermBorrowings",
+      "LongTermDebtAndCapitalLeaseObligationsCurrent",
+      "CommercialPaper",
+    ],
     true
   );
   const curL = annualSeries(facts, ["LiabilitiesCurrent"], true);
   const ltDebt = annualSeries(
     facts,
-    ["LongTermDebtNoncurrent", "LongTermDebt"],
+    [
+      "LongTermDebtNoncurrent",
+      "LongTermDebtAndCapitalLeaseObligations",
+      "LongTermDebt",
+    ],
     true
   );
   const totL = annualSeries(facts, ["Liabilities"], true);
@@ -394,7 +434,7 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
     const recvV = recv[y] || 0;
     const invV = inv[y] || 0;
     const otherCA = Math.max(0, ca - cashV - recvV - invV);
-    const ppeV = ppe[y] || 0;
+    const ppeV = ppe[y] || Math.max(0, (ppeGross[y] || 0) - (accumDep[y] || 0));
     const intangV = (goodwill[y] || 0) + (intang[y] || 0);
     const ta = totA[y] || ca + ppeV + intangV;
     const otherNCA = Math.max(0, ta - ca - ppeV - intangV);

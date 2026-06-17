@@ -631,7 +631,7 @@ const REAL_DAILY_POOL = [
   "WMT", "COST", "TGT", "HD", "LOW",
   "KO", "PEP", "PG", "CL", "NKE", "MCD", "SBUX", "MDLZ",
   "PFE", "JNJ", "MRK", "ABBV", "LLY", "UNH",
-  "CAT", "DE", "BA", "GE", "HON", "MMM", "F",
+  "CAT", "BA", "HON", "MMM", "F",
   "XOM", "CVX", "COP",
   "T", "VZ", "DIS", "NFLX", "CMCSA",
   "V",
@@ -1166,7 +1166,7 @@ function ReportsView({ c }: { c: StatementCase }) {
               return r != null && an[i].revenue ? `${((r / an[i].revenue) * 100).toFixed(0)}%` : null;
             })
           : undefined,
-    }));
+    })).filter((r) => r.vals.some((v) => v != null && v !== 0));
     const BS_LABELS = [
       "Cash & equivalents", "Receivables", "Inventory", "Other current assets", "Total current assets",
       "Property, plant & equipment", "Goodwill", "Other intangibles", "Other non-current assets", "Total assets",
@@ -1179,7 +1179,7 @@ function ReportsView({ c }: { c: StatementCase }) {
       vals: sorted.map((p, i) => repVal(p, an[i], label, "bs")),
       bold: BS_BOLD.has(label),
       indent: !BS_BOLD.has(label),
-    }));
+    })).filter((r) => r.vals.some((v) => v != null && v !== 0));
   } else {
     isRows = [
       { label: "Revenue", vals: an.map((a) => a.revenue), bold: true },
