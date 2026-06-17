@@ -74,6 +74,7 @@ import { KpiCard } from "../shared";
 import CasePlaybook from "./CasePlaybook";
 import AnalystView from "./AnalystView";
 import Formulas from "./Formulas";
+import ValuationView from "./ValuationView";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -652,6 +653,7 @@ type View =
   | "credit"
   | "reports"
   | "analysis"
+  | "valuation"
   | "comparisons"
   | "chart"
   | "leasing"
@@ -877,6 +879,7 @@ function CaseDetail({
     { key: "credit", label: "Kreditna ocena", icon: <Gauge size={15} />, group: "Profil kompanije" },
     { key: "reports", label: "Sažeti finansijski podaci", icon: <Calculator size={15} />, group: "Finansije" },
     { key: "analysis", label: "Finansije i racia", icon: <LineIcon size={15} />, group: "Finansije" },
+    { key: "valuation", label: "DCF / LBO valuacija", icon: <Calculator size={15} />, group: "Finansije" },
     { key: "comparisons", label: "Finansijska poređenja", icon: <Layers3 size={15} />, group: "Finansije" },
     { key: "chart", label: "Grafikon", icon: <LineIcon size={15} />, group: "Finansije" },
     { key: "leasing", label: "Finansijski lizing", icon: <FileText size={15} />, group: "Finansije" },
@@ -958,6 +961,7 @@ function CaseDetail({
           {view === "reports" && <ReportsView c={c} />}
           {view === "seasonality" && <SeasonalityView c={c} onChange={onChange} />}
           {view === "analysis" && <AnalysisView c={c} />}
+          {view === "valuation" && <ValuationView c={c} />}
           {view === "chart" && <AnalysisView c={c} />}
           {view === "edit" && (
             <InputsView
