@@ -211,8 +211,33 @@ export interface SecPeriod {
 }
 
 export interface SecResult {
-  company: { name: string; sector: string; cik: string; ticker: string; currency: string };
+  company: {
+    name: string;
+    sector: string;
+    cik: string;
+    ticker: string;
+    currency: string;
+    sharesOutstanding: number;
+  };
   periods: SecPeriod[];
+}
+
+/** Most recent shares outstanding from the dei facts (for market cap). */
+function latestShares(facts: any): number {
+  const candidates = [
+    facts?.facts?.dei?.EntityCommonStockSharesOutstanding,
+    facts?.facts?.["us-gaap"]?.CommonStockSharesOutstanding,
+    facts?.facts?.["us-gaap"]?.WeightedAverageNumberOfDilutedSharesOutstanding,
+    facts?.facts?.["us-gaap"]?.WeightedAverageNumberOfSharesOutstandingBasic,
+  ];
+  for (const node of candidates) {
+    const units = node?.units?.shares;
+    if (!units || !units.length) continue;
+    let latest: FactEntry | null = null;
+    for (const e of units) if (!latest || e.end > latest.end) latest = e;
+    if (latest && latest.val > 0) return latest.val;
+  }
+  return 0;
 }
 
 export async function fetchSecStatements(q: string): Promise<SecResult> {
@@ -530,6 +555,7 @@ export async function fetchSecStatements(q: string): Promise<SecResult> {
       cik: entry.cik,
       ticker: (subs.tickers && subs.tickers[0]) || entry.ticker || "",
       currency,
+      sharesOutstanding: latestShares(facts),
     },
     periods,
   };

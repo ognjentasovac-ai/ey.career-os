@@ -75,6 +75,7 @@ import CasePlaybook from "./CasePlaybook";
 import AnalystView from "./AnalystView";
 import Formulas from "./Formulas";
 import ValuationView from "./ValuationView";
+import ComparisonsView from "./ComparisonsView";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -189,6 +190,7 @@ export function Statements() {
         cik: string;
         ticker: string;
         currency: string;
+        sharesOutstanding: number;
       };
       const actualPeriods: StatementPeriod[] = (json.periods as any[]).map((p) => ({
         id: `${id}_${p.label}`,
@@ -213,6 +215,8 @@ export function Statements() {
         revealed: true,
         score: 0,
         notes: `Imported from SEC EDGAR · ${co.ticker || ""} · CIK ${co.cik} · figures as reported (${co.currency}).`,
+        ticker: co.ticker,
+        sharesOutstanding: co.sharesOutstanding,
       };
       setState((prev) => ({
         ...prev,
@@ -241,7 +245,7 @@ export function Statements() {
       const res = await fetch(`/api/sec?q=${encodeURIComponent(realTicker)}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "SEC fetch failed");
-      const co = json.company as { name: string; sector: string; cik: string; ticker: string; currency: string };
+      const co = json.company as { name: string; sector: string; cik: string; ticker: string; currency: string; sharesOutstanding: number };
       const actualPeriods: StatementPeriod[] = (json.periods as any[]).map((p) => ({
         id: `${realDailyId}_${p.label}`,
         label: p.label,
@@ -265,6 +269,8 @@ export function Statements() {
         revealed: false,
         score: 0,
         notes: `Real official SEC 10-K filing · figures as reported (${co.currency}). Identity hidden until you reveal — verify at sec.gov.`,
+        ticker: co.ticker,
+        sharesOutstanding: co.sharesOutstanding,
       };
       setState((prev) => ({
         ...prev,
@@ -980,7 +986,7 @@ function CaseDetail({
           {view === "management" && <NoDataSection title="Rukovodstvo i zaposleni" note="Direktori, zastupnici i broj zaposlenih." />}
           {view === "ownership" && <NoDataSection title="Vlasnička struktura" note="Vlasnici, udeli i krajnji stvarni vlasnici (UBO)." />}
           {view === "related" && <NoDataSection title="Povezana lica" note="Povezana pravna lica i međusobna učešća." />}
-          {view === "comparisons" && <NoDataSection title="Finansijska poređenja" note="Poređenje sa firmama iz iste delatnosti i veličine." />}
+          {view === "comparisons" && <ComparisonsView c={c} />}
           {view === "leasing" && <NoDataSection title="Finansijski lizing" note="Aktivni ugovori o finansijskom lizingu." />}
           {view === "liens" && <NoDataSection title="Založna prava" note="Registrovana založna prava i hipoteke." />}
           {view === "bills" && <NoDataSection title="Menice" note="Registrovane menice i eventualni protesti." />}

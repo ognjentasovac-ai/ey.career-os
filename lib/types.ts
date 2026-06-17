@@ -189,6 +189,8 @@ export interface StatementCase {
   revealed: boolean;
   score: number; // self-assessed 0-100
   notes: string;
+  ticker?: string; // SEC ticker (for live market data)
+  sharesOutstanding?: number; // for market cap / multiples
 }
 
 /* --------------------------- Training Academy -------------------------- */
