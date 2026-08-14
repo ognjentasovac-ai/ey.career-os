@@ -13,6 +13,10 @@ display font.
 1. **Executive Dashboard** — KPI cards, capability radar, Partner Readiness / Probability rings, next-milestone tracker.
 2. **Career Timeline** — horizontal 2026→2041 rail; fully editable positions (add / edit / delete, durations, requirements, comp).
 3. **3-Statement Reading Lab** — daily drill: enter a business's P&L, balance sheet and seasonality; the lab computes margins, the EBITDA bridge, working-capital days and a forward projection, then runs an **EY-style quiz** (buy or not, revenue sources, EBITDA quality, valuation) and asks you to guess the sector.
+   Includes a **Dijagnostički drill** — ten fixed diagnostic questions (margin bridge, net income vs. cash flow, adjusted-EBITDA
+   add-backs, DSO jumps, goodwill-heavy balance sheets, leverage in context, maintenance vs. growth capex, falling ROIC, the
+   first five numbers, and what the statements don't show) that grade your written answer against the angles it should cover,
+   anchored to the case's live numbers.
 4. **Modeling Academy** — curated, mostly-free training (ASimpleModel, Damodaran, CFI, Wall Street Prep, BIWS…) with progress tracking.
 5. **Skill Tree** — 19 finance skills across 5 categories, 0–100 levels with targets, notes and live sliders.
 6. **Deal Experience Tracker** — M&A, LBO, DD, memos, models, research; filters and aggregate statistics.

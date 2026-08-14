@@ -30,6 +30,7 @@ import {
   Sparkles,
   DownloadCloud,
   Loader2,
+  ClipboardCheck,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { StatementCase, StatementPeriod, PLData, BSData } from "@/lib/types";
@@ -72,6 +73,7 @@ import {
 } from "../ui";
 import { KpiCard } from "../shared";
 import CasePlaybook from "./CasePlaybook";
+import DiagnosticDrill from "./DiagnosticDrill";
 import AnalystView from "./AnalystView";
 import Formulas from "./Formulas";
 import ValuationView from "./ValuationView";
@@ -669,6 +671,7 @@ type View =
   | "seasonality"
   | "analyst"
   | "quiz"
+  | "drill"
   | "playbook"
   | "formulas";
 
@@ -895,6 +898,7 @@ function CaseDetail({
     { key: "seasonality", label: "Sezonalnost", icon: <CalendarPlus size={15} />, group: "EY alati" },
     { key: "edit", label: "Unos podataka", icon: <Calculator size={15} />, group: "EY alati" },
     { key: "quiz", label: "EY Kviz", icon: <HelpCircle size={15} />, group: "EY alati" },
+    { key: "drill", label: "Dijagnostički drill", icon: <ClipboardCheck size={15} />, group: "EY alati" },
     { key: "playbook", label: "Case Playbook", icon: <BookOpen size={15} />, group: "EY alati" },
     { key: "formulas", label: "Formule", icon: <Sigma size={15} />, group: "EY alati" },
   ];
@@ -978,6 +982,7 @@ function CaseDetail({
             />
           )}
           {view === "quiz" && <QuizView c={c} onChange={onChange} />}
+          {view === "drill" && <DiagnosticDrill c={c} onChange={onChange} />}
           {view === "analyst" && <AnalystView c={c} />}
           {view === "playbook" && <CasePlaybook />}
           {view === "formulas" && <Formulas />}
